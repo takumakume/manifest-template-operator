@@ -1,0 +1,27 @@
+# permissions for end users to view manifesttemplates.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: manifesttemplate-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: manifest-template-operator
+    app.kubernetes.io/part-of: manifest-template-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: manifesttemplate-viewer-role
+rules:
+- apiGroups:
+  - manifest-template.takumakume.github.io
+  resources:
+  - manifesttemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - manifest-template.takumakume.github.io
+  resources:
+  - manifesttemplates/status
+  verbs:
+  - get

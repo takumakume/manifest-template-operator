@@ -1,0 +1,12 @@
+apiVersion: manifest-template.takumakume.github.io/v1alpha1
+kind: ManifestTemplate
+metadata:
+  labels:
+    app.kubernetes.io/name: manifesttemplate
+    app.kubernetes.io/instance: manifesttemplate-sample
+    app.kubernetes.io/part-of: manifest-template-operator
+    app.kuberentes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: manifest-template-operator
+  name: manifesttemplate-sample
+spec:
+  # TODO(user): Add fields here

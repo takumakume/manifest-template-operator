@@ -1,0 +1,16 @@
+domain: takumakume.github.io
+layout:
+- go.kubebuilder.io/v4-alpha
+projectName: manifest-template-operator
+repo: github.com/takumakume/manifest-template-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: takumakume.github.io
+  group: manifest-template
+  kind: ManifestTemplate
+  path: github.com/takumakume/manifest-template-operator/api/v1alpha1
+  version: v1alpha1
+version: "3"
