@@ -1,0 +1,33 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - manifest-template.takumakume.github.io
+  resources:
+  - manifesttemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - manifest-template.takumakume.github.io
+  resources:
+  - manifesttemplates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - manifest-template.takumakume.github.io
+  resources:
+  - manifesttemplates/status
+  verbs:
+  - get
+  - patch
+  - update
