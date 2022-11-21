@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -28,14 +29,15 @@ type ManifestTemplateSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of ManifestTemplate. Edit manifesttemplate_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// ManifestTemplate is raw yaml of kubernetes manifest that can use go-template
+	// +kubebuilder:validation:Required
+	ManifestTemplate string `json:"manifestTemplate,omitempty"`
 }
 
 // ManifestTemplateStatus defines the observed state of ManifestTemplate
 type ManifestTemplateStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Ready is the manifest application state
+	Ready corev1.ConditionStatus `json:"ready,omitempty"`
 }
 
 //+kubebuilder:object:root=true
