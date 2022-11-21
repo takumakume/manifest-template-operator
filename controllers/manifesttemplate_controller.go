@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	manifesttemplatev1alpha1 "github.com/takumakume/manifest-template-operator/api/v1alpha1"
@@ -64,6 +65,25 @@ type ManifestTemplateReconciler struct {
 func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
+	log := log.FromContext(ctx).WithValues("ManifestTemplate", req.NamespacedName.String())
+
+	manifestTemplate := &manifesttemplatev1alpha1.ManifestTemplate{}
+	if err := r.Get(ctx, req.NamespacedName, manifestTemplate); err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+
+		log.Error(err, "unable to fetch ManifestTemplate")
+		return ctrl.Result{}, err
+	}
+
+	log.Info("starting reconcile loop")
+	defer log.Info("finish reconcile loop")
+
+	if !manifestTemplate.GetDeletionTimestamp().IsZero() {
+		return ctrl.Result{}, nil
+	}
+
 	restConfig, err := rest.InClusterConfig()
 	if err != nil {
 		return ctrl.Result{}, err
@@ -89,7 +109,27 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	// TODO
-	manifest := ""
+	manifest := `---
+kind: Service
+metadata:
+  name: test1
+  namespace: test
+spec:
+  ports:
+  - port: 80
+  selector:
+    app: test1
+---
+kind: Service
+metadata:
+  name: test2
+  namespace: test
+spec:
+  ports:
+  - port: 80
+  selector:
+    app: test2
+`
 
 	decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(manifest), 100)
 	for {
