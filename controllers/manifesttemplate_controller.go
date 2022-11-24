@@ -18,21 +18,13 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	serializeryaml "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
-	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -52,6 +44,7 @@ type ManifestTemplateReconciler struct {
 //+kubebuilder:rbac:groups=manifest-template.takumakume.github.io,resources=manifesttemplates,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=manifest-template.takumakume.github.io,resources=manifesttemplates/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=manifest-template.takumakume.github.io,resources=manifesttemplates/finalizers,verbs=update
+//+kubebuilder:rbac:groups="*",resources="*",verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -78,105 +71,94 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	log.Info("starting reconcile loop")
-	defer log.Info("finish reconcile loop")
 
-	if !manifestTemplate.GetDeletionTimestamp().IsZero() {
-		return ctrl.Result{}, nil
+	apiVersion := "v1"
+	var group string
+	var version string
+	s := strings.Split(apiVersion, "/")
+	if len(s) != 1 {
+		group = s[0]
 	}
+	version = s[len(s)-1]
 
-	restConfig, err := rest.InClusterConfig()
+	kind := "Service"
+	name := "test1"
+	namespace := manifestTemplate.ObjectMeta.Namespace
+	labels := map[string]string{
+		"label1": "label1value",
+	}
+	annotations := map[string]string{
+		"anno1": "anno1value",
+	}
+	spec := map[string]interface{}{
+		"ports": []map[string]interface{}{
+			{
+				"port": 80,
+			},
+		},
+		"selector": map[string]interface{}{
+			"app": "test1",
+		},
+	}
+	ownerRef := metav1.NewControllerRef(
+		&manifestTemplate.ObjectMeta,
+		schema.GroupVersionKind{
+			Group:   manifesttemplatev1alpha1.GroupVersion.Group,
+			Version: manifesttemplatev1alpha1.GroupVersion.Version,
+			Kind:    "ManifestTemplate",
+		})
+	ownerRef.Name = manifestTemplate.Name
+	ownerRef.UID = manifestTemplate.GetUID()
+
+	u := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"name":        name,
+				"namespace":   namespace,
+				"labels":      labels,
+				"annotations": annotations,
+				"ownerReferences": []metav1.OwnerReference{
+					*ownerRef,
+				},
+			},
+			"spec": spec,
+		},
+	}
+	u.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   group,
+		Kind:    kind,
+		Version: version,
+	})
+
+	exists := &unstructured.Unstructured{}
+	exists.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   group,
+		Kind:    kind,
+		Version: version,
+	})
+	err := r.Get(ctx, client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}, exists)
 	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	clientSet, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	discoveryClient := clientSet.Discovery()
-
-	groupResources, err := restmapper.GetAPIGroupResources(discoveryClient)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	mapper := restmapper.NewDiscoveryRESTMapper(groupResources)
-
-	dynamicClient, err := dynamic.NewForConfig(restConfig)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// TODO
-	manifest := `---
-kind: Service
-metadata:
-  name: test1
-  namespace: test
-spec:
-  ports:
-  - port: 80
-  selector:
-    app: test1
----
-kind: Service
-metadata:
-  name: test2
-  namespace: test
-spec:
-  ports:
-  - port: 80
-  selector:
-    app: test2
-`
-
-	decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(manifest), 100)
-	for {
-		//var rawObj runtime.RawExtension
-		var rawObj []byte
-		if err := decoder.Decode(&rawObj); err != nil {
-			fmt.Println("end of contents")
-			break
-		}
-
-		obj := &unstructured.Unstructured{}
-
-		// Create client (client, err := dynamic.NewClient(rawObj.Raw, obj))
-		dec := serializeryaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
-		_, gvk, err := dec.Decode(rawObj, nil, obj)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		var client dynamic.ResourceInterface
-		if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
-			if obj.GetNamespace() == "" {
-				// TODO: set namespace
-				obj.SetNamespace(metav1.NamespaceDefault)
+		if apierrors.IsNotFound(err) {
+			// create
+			log.Info(fmt.Sprintf("======== try create: %+v", u))
+			if err := r.Create(ctx, u); err != nil {
+				return ctrl.Result{}, err
 			}
-			client = dynamicClient.Resource(mapping.Resource).Namespace(obj.GetNamespace())
+			log.Info("======== created")
 		} else {
-			client = dynamicClient.Resource(mapping.Resource)
-		}
-
-		// Apply (res, err := dynamic.Apply(client, obj))
-		data, err := json.Marshal(obj)
-		if err != nil {
 			return ctrl.Result{}, err
 		}
-
-		opt := metav1.PatchOptions{FieldManager: "example"}
-		o, err := client.Patch(ctx, obj.GetName(), types.ApplyPatchType, data, opt)
-		if err != nil {
+	} else {
+		// update
+		log.Info(fmt.Sprintf("======== exists: %+v", exists))
+		log.Info(fmt.Sprintf("======== try update: %+v", u))
+		if err := r.Update(ctx, u); err != nil {
 			return ctrl.Result{}, err
 		}
-		fmt.Printf("applied: %+v\n", o)
+		log.Info("======== updated")
 	}
 
 	return ctrl.Result{}, nil
