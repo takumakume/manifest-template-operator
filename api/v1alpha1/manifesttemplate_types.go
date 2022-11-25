@@ -17,21 +17,88 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"encoding/json"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+// Unstructured values for rendering Helm Charts
+// +k8s:deepcopy-gen=false
+type SpecMap struct {
+	// Object is a JSON compatible map with string, float, int, bool, []interface{}, or
+	// map[string]interface{} children.
+	Object map[string]interface{} `json:"-"`
+}
+
+// MarshalJSON ensures that the unstructured object produces proper
+// JSON when passed to Go's standard JSON library.
+func (u *SpecMap) MarshalJSON() ([]byte, error) {
+	return json.Marshal(u.Object)
+}
+
+// UnmarshalJSON ensures that the unstructured object properly decodes
+// JSON when passed to Go's standard JSON library.
+func (u *SpecMap) UnmarshalJSON(data []byte) error {
+	m := make(map[string]interface{})
+	if err := json.Unmarshal(data, &m); err != nil {
+		return err
+	}
+
+	u.Object = m
+
+	return nil
+}
+
+// Declaring this here prevents it from being generated.
+func (u *SpecMap) DeepCopyInto(out *SpecMap) {
+	out.Object = runtime.DeepCopyJSON(u.Object)
+}
 
 // ManifestTemplateSpec defines the desired state of ManifestTemplate
 type ManifestTemplateSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// ManifestTemplate is raw yaml of kubernetes manifest that can use go-template
+	// Kind
 	// +kubebuilder:validation:Required
-	ManifestTemplate string `json:"manifestTemplate,omitempty"`
+	Kind string `json:"kind,omitempty"`
+
+	// APIVersion
+	// +kubebuilder:validation:Required
+	APIVersion string `json:"apiVersion,omitempty"`
+
+	// Metadata
+	// +kubebuilder:validation:Required
+	Metadata ManifestTemplateSpecMeta `json:"Metadata,omitempty"`
+
+	// Spec
+	// +kubebuilder:validation:XPreserveUnknownFields
+	// +kubebuilder:validation:Type=object
+	// +kubebuilder:validation:Schemaless
+	Spec SpecMap `json:"Spec,omitempty"`
+}
+
+type ManifestTemplateSpecMeta struct {
+	// Name
+	// +kubebuilder:validation:Required
+	Name string `json:"name,omitempty"`
+
+	// Namespace
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace,omitempty"`
+
+	// Labels
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Annotations
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // ManifestTemplateStatus defines the observed state of ManifestTemplate

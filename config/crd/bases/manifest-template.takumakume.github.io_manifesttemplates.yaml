@@ -35,9 +35,35 @@ spec:
           spec:
             description: ManifestTemplateSpec defines the desired state of ManifestTemplate
             properties:
-              manifestTemplate:
-                description: ManifestTemplate is raw yaml of kubernetes manifest that
-                  can use go-template
+              Metadata:
+                description: Metadata
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels
+                    type: object
+                  name:
+                    description: Name
+                    type: string
+                  namespace:
+                    description: Namespace
+                    type: string
+                type: object
+              Spec:
+                description: Spec
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              apiVersion:
+                description: APIVersion
+                type: string
+              kind:
+                description: Kind
                 type: string
             type: object
           status:

@@ -1,0 +1,205 @@
+/*
+Copyright 2022.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package controllers
+
+import (
+	"reflect"
+	"testing"
+	"time"
+
+	"github.com/k0kubun/pp"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	manifesttemplatev1alpha1 "github.com/takumakume/manifest-template-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var True bool = true
+
+var _ = Describe("ManifestTemplate controller", func() {
+	BeforeEach(func() {
+		err := k8sClient.DeleteAllOf(ctx, &manifesttemplatev1alpha1.ManifestTemplate{}, client.InNamespace("test"))
+		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &corev1.Service{}, client.InNamespace("test"))
+		Expect(err).NotTo(HaveOccurred())
+		time.Sleep(100 * time.Millisecond)
+
+		err = k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test1"}, &corev1.Service{})
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("aa", func() {
+		manifestTemplate := &manifesttemplatev1alpha1.ManifestTemplate{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "sample",
+				Namespace: "test",
+			},
+			Spec: manifesttemplatev1alpha1.ManifestTemplateSpec{
+				Kind:       "Service",
+				APIVersion: "v1",
+				Metadata: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
+					Name:      "test1",
+					Namespace: "test",
+					Labels: map[string]string{
+						"label1": "label1value",
+					},
+					Annotations: map[string]string{
+						"annotation1": "annotation1value",
+					},
+				},
+				Spec: manifesttemplatev1alpha1.SpecMap{
+					Object: map[string]interface{}{
+						"ports": []map[string]interface{}{
+							{
+								"port": 80,
+							},
+						},
+						"selector": map[string]interface{}{
+							"app": "test1",
+						},
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, manifestTemplate)).Should(Succeed())
+
+		// Eventually(func() (v1.ConditionStatus, error) {
+		// 	o := &manifesttemplatev1alpha1.ManifestTemplate{}
+
+		// 	err := k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "sample"}, o)
+		// 	if err != nil {
+		// 		return "", err
+		// 	}
+		// 	return o.Status.Ready, nil
+		// }, 20, 1).Should(Equal(v1.ConditionTrue))
+
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test1"}, &corev1.Service{})
+		}, 5, 1).Should(Succeed())
+
+		// Eventually(func() error {
+		// 	o := &corev1.Service{}
+		// 	err := k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test2"}, o)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	return nil
+		// }, 20, 1).Should(Succeed())
+
+	})
+})
+
+func Test_desireUnstructured(t *testing.T) {
+	type args struct {
+		manifestTemplate *manifesttemplatev1alpha1.ManifestTemplate
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *unstructured.Unstructured
+		wantErr bool
+	}{
+		{
+			name: "default",
+			args: args{
+				manifestTemplate: &manifesttemplatev1alpha1.ManifestTemplate{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "sample",
+						Namespace: "test",
+					},
+					Spec: manifesttemplatev1alpha1.ManifestTemplateSpec{
+						Kind:       "Service",
+						APIVersion: "v1",
+						Metadata: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
+							Name:      "test1",
+							Namespace: "test",
+							Labels: map[string]string{
+								"label1": "label1value",
+							},
+							Annotations: map[string]string{
+								"annotation1": "annotation1value",
+							},
+						},
+						Spec: manifesttemplatev1alpha1.SpecMap{
+							Object: map[string]interface{}{
+								"ports": []map[string]interface{}{
+									{
+										"port": 80,
+									},
+								},
+								"selector": map[string]interface{}{
+									"app": "test1",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"ownerReferences": []metav1.OwnerReference{
+							{
+								APIVersion:         "manifest-template.takumakume.github.io/v1alpha1",
+								Kind:               "ManifestTemplate",
+								Name:               "sample",
+								UID:                "",
+								Controller:         &True,
+								BlockOwnerDeletion: &True,
+							},
+						},
+						"name":      "test1",
+						"namespace": "test",
+						"labels": map[string]string{
+							"label1": "label1value",
+						},
+						"annotations": map[string]string{
+							"annotation1": "annotation1value",
+						},
+					},
+					"spec": map[string]interface{}{
+						"ports": []interface{}{
+							map[string]interface{}{
+								"port": 80,
+							},
+						},
+						"selector": map[string]interface{}{
+							"app": "test1",
+						},
+					},
+					"apiVersion": "v1",
+					"kind":       "Service",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := desireUnstructured(tt.args.manifestTemplate)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("desireUnstructured() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("desireUnstructured() = %v, want %v", pp.Sprint(got), pp.Sprint(tt.want))
+			}
+		})
+	}
+}

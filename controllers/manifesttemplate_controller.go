@@ -17,9 +17,13 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"html/template"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +36,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/k0kubun/pp"
 	manifesttemplatev1alpha1 "github.com/takumakume/manifest-template-operator/api/v1alpha1"
 )
 
@@ -72,79 +77,37 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	log.Info("starting reconcile loop")
 
-	apiVersion := "v1"
+	desired, err := desireUnstructured(manifestTemplate)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	log.Info(pp.Sprint(desired))
+
 	var group string
 	var version string
-	s := strings.Split(apiVersion, "/")
+	s := strings.Split(manifestTemplate.Spec.APIVersion, "/")
 	if len(s) != 1 {
 		group = s[0]
 	}
 	version = s[len(s)-1]
 
-	kind := "Service"
-	name := "test1"
-	namespace := manifestTemplate.ObjectMeta.Namespace
-	labels := map[string]string{
-		"label1": "label1value",
-	}
-	annotations := map[string]string{
-		"anno1": "anno1value",
-	}
-	spec := map[string]interface{}{
-		"ports": []map[string]interface{}{
-			{
-				"port": 80,
-			},
-		},
-		"selector": map[string]interface{}{
-			"app": "test1",
-		},
-	}
-	ownerRef := metav1.NewControllerRef(
-		&manifestTemplate.ObjectMeta,
-		schema.GroupVersionKind{
-			Group:   manifesttemplatev1alpha1.GroupVersion.Group,
-			Version: manifesttemplatev1alpha1.GroupVersion.Version,
-			Kind:    "ManifestTemplate",
-		})
-	ownerRef.Name = manifestTemplate.Name
-	ownerRef.UID = manifestTemplate.GetUID()
-
-	u := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"name":        name,
-				"namespace":   namespace,
-				"labels":      labels,
-				"annotations": annotations,
-				"ownerReferences": []metav1.OwnerReference{
-					*ownerRef,
-				},
-			},
-			"spec": spec,
-		},
-	}
-	u.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   group,
-		Kind:    kind,
-		Version: version,
-	})
-
 	exists := &unstructured.Unstructured{}
 	exists.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   group,
-		Kind:    kind,
+		Kind:    manifestTemplate.Spec.Kind,
 		Version: version,
 	})
-	err := r.Get(ctx, client.ObjectKey{
-		Namespace: namespace,
-		Name:      name,
-	}, exists)
-	if err != nil {
+	objKey := client.ObjectKey{
+		Namespace: desired.GetNamespace(),
+		Name:      desired.GetName(),
+	}
+	log.Info(pp.Sprint(exists))
+	if err := r.Get(ctx, objKey, exists); err != nil {
 		if apierrors.IsNotFound(err) {
 			// create
-			log.Info(fmt.Sprintf("======== try create: %+v", u))
-			if err := r.Create(ctx, u); err != nil {
+			log.Info(fmt.Sprintf("======== try create: %+v", pp.Sprint(desired)))
+			if err := r.Create(ctx, desired); err != nil {
 				return ctrl.Result{}, err
 			}
 			log.Info("======== created")
@@ -153,9 +116,9 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	} else {
 		// update
-		log.Info(fmt.Sprintf("======== exists: %+v", exists))
-		log.Info(fmt.Sprintf("======== try update: %+v", u))
-		if err := r.Update(ctx, u); err != nil {
+		log.Info(fmt.Sprintf("======== exists: %+v", pp.Sprint(exists)))
+		log.Info(fmt.Sprintf("======== try update: %+v", pp.Sprint(desired)))
+		if err := r.Update(ctx, desired); err != nil {
 			return ctrl.Result{}, err
 		}
 		log.Info("======== updated")
@@ -169,4 +132,120 @@ func (r *ManifestTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&manifesttemplatev1alpha1.ManifestTemplate{}).
 		Complete(r)
+}
+
+func desireUnstructured(manifestTemplate *manifesttemplatev1alpha1.ManifestTemplate) (*unstructured.Unstructured, error) {
+	ownerRef := metav1.NewControllerRef(
+		&manifestTemplate.ObjectMeta,
+		schema.GroupVersionKind{
+			Group:   manifesttemplatev1alpha1.GroupVersion.Group,
+			Version: manifesttemplatev1alpha1.GroupVersion.Version,
+			Kind:    "ManifestTemplate",
+		})
+	ownerRef.Name = manifestTemplate.Name
+	ownerRef.UID = manifestTemplate.GetUID()
+
+	u := &unstructured.Unstructured{}
+
+	render := newRender(manifestTemplate)
+
+	name, err := render.render(manifestTemplate.Spec.Metadata.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	namespace, err := render.render(manifestTemplate.Spec.Metadata.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	labels := map[string]string{}
+	if len(manifestTemplate.Spec.Metadata.Labels) > 0 {
+		for k, v := range manifestTemplate.Spec.Metadata.Labels {
+			if o, err := render.render(v); err == nil {
+				labels[k] = o
+			} else {
+				return nil, err
+			}
+		}
+	}
+
+	annotations := map[string]string{}
+	if len(manifestTemplate.Spec.Metadata.Annotations) > 0 {
+		for k, v := range manifestTemplate.Spec.Metadata.Annotations {
+			if o, err := render.render(v); err == nil {
+				annotations[k] = o
+			} else {
+				return nil, err
+			}
+		}
+	}
+
+	raw, err := yaml.Marshal(manifestTemplate.Spec.Spec.Object)
+	if err != nil {
+		return nil, err
+	}
+	renderd, err := render.render(string(raw))
+	if err != nil {
+		return nil, err
+	}
+	spec := map[string]interface{}{}
+	if err := yaml.Unmarshal([]byte(renderd), &spec); err != nil {
+		return nil, err
+	}
+
+	u.Object = map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"name":        name,
+			"namespace":   namespace,
+			"labels":      labels,
+			"annotations": annotations,
+			"ownerReferences": []metav1.OwnerReference{
+				*ownerRef,
+			},
+		},
+		"spec": spec,
+	}
+
+	var group string
+	var version string
+	s := strings.Split(manifestTemplate.Spec.APIVersion, "/")
+	if len(s) != 1 {
+		group = s[0]
+	}
+	version = s[len(s)-1]
+
+	u.SetGroupVersionKind(schema.GroupVersionKind{
+		Kind:    manifestTemplate.Spec.Kind,
+		Group:   group,
+		Version: version,
+	})
+
+	return u, nil
+}
+
+type Render struct {
+	data map[string]interface{}
+}
+
+func newRender(manifestTemplate *manifesttemplatev1alpha1.ManifestTemplate) *Render {
+	return &Render{
+		data: map[string]interface{}{
+			"Self": manifestTemplate,
+		},
+	}
+}
+
+func (r *Render) render(tmpl string) (string, error) {
+	tpl, err := template.New("").Parse(tmpl)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if err := tpl.Execute(&buf, r.data); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }
