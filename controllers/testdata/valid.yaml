@@ -1,0 +1,21 @@
+---
+apiVersion: manifest-template.takumakume.github.io/v1alpha1
+kind: ManifestTemplate
+metadata:
+  name: valid
+  namespace: test
+spec:
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: valid-svc
+    namespace: test
+    labels:
+      label1: label1value
+    annotations:
+      annotation1: annotation1value
+  spec:
+    ports:
+    - port: 80
+    selector:
+      app: test1

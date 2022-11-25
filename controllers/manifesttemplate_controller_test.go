@@ -17,7 +17,10 @@ limitations under the License.
 package controllers
 
 import (
+	"io/ioutil"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -83,6 +87,30 @@ var _ = Describe("ManifestTemplate controller", func() {
 		generated := &corev1.Service{}
 		Eventually(func() error {
 			return k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test1"}, generated)
+		}, 5, 1).Should(Succeed())
+		Expect(generated.ObjectMeta.Labels).Should(Equal(map[string]string{"label1": "label1value"}))
+		Expect(generated.ObjectMeta.Annotations).Should(Equal(map[string]string{"annotation1": "annotation1value"}))
+		Expect(generated.Spec.Ports[0].Port).Should(Equal(int32(80)))
+		Expect(generated.Spec.Selector["app"]).Should(Equal("test1"))
+	})
+
+	It("manifest valid", func() {
+		rawTestData, errReading := ioutil.ReadFile(filepath.Join("testdata", "valid.yaml"))
+		if errReading != nil {
+			Fail("Failed to read valid test file")
+		}
+		manifestTemplate := &manifesttemplatev1alpha1.ManifestTemplate{}
+
+		d := yaml.NewYAMLOrJSONDecoder(strings.NewReader(string(rawTestData)), len(rawTestData))
+		errDecording := d.Decode(manifestTemplate)
+		if errDecording != nil {
+			Fail("Failed to decode test data")
+		}
+		Expect(k8sClient.Create(ctx, manifestTemplate)).Should(Succeed())
+
+		generated := &corev1.Service{}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "valid-svc"}, generated)
 		}, 5, 1).Should(Succeed())
 		Expect(generated.ObjectMeta.Labels).Should(Equal(map[string]string{"label1": "label1value"}))
 		Expect(generated.ObjectMeta.Annotations).Should(Equal(map[string]string{"annotation1": "annotation1value"}))
