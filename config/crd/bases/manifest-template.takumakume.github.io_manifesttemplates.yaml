@@ -54,6 +54,9 @@ spec:
                   namespace:
                     description: Namespace
                     type: string
+                required:
+                - name
+                - namespace
                 type: object
               Spec:
                 description: Spec
@@ -65,6 +68,11 @@ spec:
               kind:
                 description: Kind
                 type: string
+            required:
+            - Metadata
+            - Spec
+            - apiVersion
+            - kind
             type: object
           status:
             description: ManifestTemplateStatus defines the observed state of ManifestTemplate

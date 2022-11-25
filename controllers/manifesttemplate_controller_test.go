@@ -45,7 +45,7 @@ var _ = Describe("ManifestTemplate controller", func() {
 		Expect(err).To(HaveOccurred())
 	})
 
-	It("aa", func() {
+	It("default", func() {
 		manifestTemplate := &manifesttemplatev1alpha1.ManifestTemplate{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "sample",
@@ -64,7 +64,7 @@ var _ = Describe("ManifestTemplate controller", func() {
 						"annotation1": "annotation1value",
 					},
 				},
-				Spec: manifesttemplatev1alpha1.SpecMap{
+				Spec: manifesttemplatev1alpha1.Spec{
 					Object: map[string]interface{}{
 						"ports": []map[string]interface{}{
 							{
@@ -80,29 +80,14 @@ var _ = Describe("ManifestTemplate controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, manifestTemplate)).Should(Succeed())
 
-		// Eventually(func() (v1.ConditionStatus, error) {
-		// 	o := &manifesttemplatev1alpha1.ManifestTemplate{}
-
-		// 	err := k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "sample"}, o)
-		// 	if err != nil {
-		// 		return "", err
-		// 	}
-		// 	return o.Status.Ready, nil
-		// }, 20, 1).Should(Equal(v1.ConditionTrue))
-
+		generated := &corev1.Service{}
 		Eventually(func() error {
-			return k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test1"}, &corev1.Service{})
+			return k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test1"}, generated)
 		}, 5, 1).Should(Succeed())
-
-		// Eventually(func() error {
-		// 	o := &corev1.Service{}
-		// 	err := k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test2"}, o)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	return nil
-		// }, 20, 1).Should(Succeed())
-
+		Expect(generated.ObjectMeta.Labels).Should(Equal(map[string]string{"label1": "label1value"}))
+		Expect(generated.ObjectMeta.Annotations).Should(Equal(map[string]string{"annotation1": "annotation1value"}))
+		Expect(generated.Spec.Ports[0].Port).Should(Equal(int32(80)))
+		Expect(generated.Spec.Selector["app"]).Should(Equal("test1"))
 	})
 })
 
@@ -137,7 +122,7 @@ func Test_desireUnstructured(t *testing.T) {
 								"annotation1": "annotation1value",
 							},
 						},
-						Spec: manifesttemplatev1alpha1.SpecMap{
+						Spec: manifesttemplatev1alpha1.Spec{
 							Object: map[string]interface{}{
 								"ports": []map[string]interface{}{
 									{

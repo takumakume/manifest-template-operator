@@ -29,7 +29,7 @@ import (
 
 // Unstructured values for rendering Helm Charts
 // +k8s:deepcopy-gen=false
-type SpecMap struct {
+type Spec struct {
 	// Object is a JSON compatible map with string, float, int, bool, []interface{}, or
 	// map[string]interface{} children.
 	Object map[string]interface{} `json:"-"`
@@ -37,13 +37,13 @@ type SpecMap struct {
 
 // MarshalJSON ensures that the unstructured object produces proper
 // JSON when passed to Go's standard JSON library.
-func (u *SpecMap) MarshalJSON() ([]byte, error) {
+func (u *Spec) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Object)
 }
 
 // UnmarshalJSON ensures that the unstructured object properly decodes
 // JSON when passed to Go's standard JSON library.
-func (u *SpecMap) UnmarshalJSON(data []byte) error {
+func (u *Spec) UnmarshalJSON(data []byte) error {
 	m := make(map[string]interface{})
 	if err := json.Unmarshal(data, &m); err != nil {
 		return err
@@ -55,7 +55,7 @@ func (u *SpecMap) UnmarshalJSON(data []byte) error {
 }
 
 // Declaring this here prevents it from being generated.
-func (u *SpecMap) DeepCopyInto(out *SpecMap) {
+func (u *Spec) DeepCopyInto(out *Spec) {
 	out.Object = runtime.DeepCopyJSON(u.Object)
 }
 
@@ -66,31 +66,30 @@ type ManifestTemplateSpec struct {
 
 	// Kind
 	// +kubebuilder:validation:Required
-	Kind string `json:"kind,omitempty"`
+	Kind string `json:"kind"`
 
 	// APIVersion
 	// +kubebuilder:validation:Required
-	APIVersion string `json:"apiVersion,omitempty"`
+	APIVersion string `json:"apiVersion"`
 
 	// Metadata
 	// +kubebuilder:validation:Required
-	Metadata ManifestTemplateSpecMeta `json:"Metadata,omitempty"`
+	Metadata ManifestTemplateSpecMeta `json:"Metadata"`
 
 	// Spec
 	// +kubebuilder:validation:XPreserveUnknownFields
-	// +kubebuilder:validation:Type=object
-	// +kubebuilder:validation:Schemaless
-	Spec SpecMap `json:"Spec,omitempty"`
+	// +kubebuilder:validation:Required
+	Spec Spec `json:"Spec"`
 }
 
 type ManifestTemplateSpecMeta struct {
 	// Name
 	// +kubebuilder:validation:Required
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 
 	// Namespace
 	// +kubebuilder:validation:Required
-	Namespace string `json:"namespace,omitempty"`
+	Namespace string `json:"namespace"`
 
 	// Labels
 	// +optional

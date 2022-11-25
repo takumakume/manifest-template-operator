@@ -76,6 +76,7 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	log.Info("starting reconcile loop")
+	log.Info(pp.Sprint(manifestTemplate))
 
 	desired, err := desireUnstructured(manifestTemplate)
 	if err != nil {
@@ -102,7 +103,6 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		Namespace: desired.GetNamespace(),
 		Name:      desired.GetName(),
 	}
-	log.Info(pp.Sprint(exists))
 	if err := r.Get(ctx, objKey, exists); err != nil {
 		if apierrors.IsNotFound(err) {
 			// create
