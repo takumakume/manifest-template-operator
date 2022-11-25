@@ -9,7 +9,7 @@ spec:
   kind: Service
   metadata:
     name: valid-svc
-    namespace: test
+    namespace: "{{ .Self.ObjectMeta.Namespace }}"
     labels:
       label1: label1value
     annotations:
@@ -19,3 +19,4 @@ spec:
     - port: 80
     selector:
       app: test1
+      ns: "{{ .Self.ObjectMeta.Namespace }}"

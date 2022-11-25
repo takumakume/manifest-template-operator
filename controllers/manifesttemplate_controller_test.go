@@ -17,7 +17,7 @@ limitations under the License.
 package controllers
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -60,7 +60,7 @@ var _ = Describe("ManifestTemplate controller", func() {
 				APIVersion: "v1",
 				Metadata: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
 					Name:      "test1",
-					Namespace: "test",
+					Namespace: "{{ .Self.ObjectMeta.Namespace }}",
 					Labels: map[string]string{
 						"label1": "label1value",
 					},
@@ -77,6 +77,7 @@ var _ = Describe("ManifestTemplate controller", func() {
 						},
 						"selector": map[string]interface{}{
 							"app": "test1",
+							"ns":  "{{ .Self.ObjectMeta.Namespace }}",
 						},
 					},
 				},
@@ -88,14 +89,16 @@ var _ = Describe("ManifestTemplate controller", func() {
 		Eventually(func() error {
 			return k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test1"}, generated)
 		}, 5, 1).Should(Succeed())
+		Expect(generated.ObjectMeta.Namespace).Should(Equal("test"))
 		Expect(generated.ObjectMeta.Labels).Should(Equal(map[string]string{"label1": "label1value"}))
 		Expect(generated.ObjectMeta.Annotations).Should(Equal(map[string]string{"annotation1": "annotation1value"}))
 		Expect(generated.Spec.Ports[0].Port).Should(Equal(int32(80)))
 		Expect(generated.Spec.Selector["app"]).Should(Equal("test1"))
+		Expect(generated.Spec.Selector["ns"]).Should(Equal("test"))
 	})
 
 	It("manifest valid", func() {
-		rawTestData, errReading := ioutil.ReadFile(filepath.Join("testdata", "valid.yaml"))
+		rawTestData, errReading := os.ReadFile(filepath.Join("testdata", "valid.yaml"))
 		if errReading != nil {
 			Fail("Failed to read valid test file")
 		}
@@ -112,10 +115,12 @@ var _ = Describe("ManifestTemplate controller", func() {
 		Eventually(func() error {
 			return k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "valid-svc"}, generated)
 		}, 5, 1).Should(Succeed())
+		Expect(generated.ObjectMeta.Namespace).Should(Equal("test"))
 		Expect(generated.ObjectMeta.Labels).Should(Equal(map[string]string{"label1": "label1value"}))
 		Expect(generated.ObjectMeta.Annotations).Should(Equal(map[string]string{"annotation1": "annotation1value"}))
 		Expect(generated.Spec.Ports[0].Port).Should(Equal(int32(80)))
 		Expect(generated.Spec.Selector["app"]).Should(Equal("test1"))
+		Expect(generated.Spec.Selector["ns"]).Should(Equal("test"))
 	})
 })
 
