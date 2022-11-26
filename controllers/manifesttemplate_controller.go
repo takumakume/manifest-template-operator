@@ -85,13 +85,7 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	log.Info(pp.Sprint(desired))
 
-	var group string
-	var version string
-	s := strings.Split(manifestTemplate.Spec.APIVersion, "/")
-	if len(s) != 1 {
-		group = s[0]
-	}
-	version = s[len(s)-1]
+	group, version := getGroupVersion(manifestTemplate.Spec.APIVersion)
 
 	exists := &unstructured.Unstructured{}
 	exists.SetGroupVersionKind(schema.GroupVersionKind{
@@ -207,13 +201,7 @@ func desireUnstructured(manifestTemplate *manifesttemplatev1alpha1.ManifestTempl
 		"spec": spec,
 	}
 
-	var group string
-	var version string
-	s := strings.Split(manifestTemplate.Spec.APIVersion, "/")
-	if len(s) != 1 {
-		group = s[0]
-	}
-	version = s[len(s)-1]
+	group, version := getGroupVersion(manifestTemplate.Spec.APIVersion)
 
 	u.SetGroupVersionKind(schema.GroupVersionKind{
 		Kind:    manifestTemplate.Spec.Kind,
@@ -222,6 +210,18 @@ func desireUnstructured(manifestTemplate *manifesttemplatev1alpha1.ManifestTempl
 	})
 
 	return u, nil
+}
+
+func getGroupVersion(apiVersion string) (string, string) {
+	group := ""
+	version := ""
+	s := strings.Split(apiVersion, "/")
+	if len(s) != 1 {
+		group = s[0]
+	}
+	version = s[len(s)-1]
+
+	return group, version
 }
 
 type Render struct {
