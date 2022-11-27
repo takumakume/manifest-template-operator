@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -111,15 +110,10 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			return ctrl.Result{}, err
 		}
 	} else {
-		if equality.Semantic.DeepEqual(exists, desired) {
-			log.Info("resource up to date")
-			return ctrl.Result{}, nil
-		} else {
-			log.Info(fmt.Sprintf("update resource = %s", pp.Sprint(desired)))
-			if err := r.Update(ctx, desired); err != nil {
-				log.Error(err, "failed to update resource")
-				return ctrl.Result{}, err
-			}
+		log.Info(fmt.Sprintf("update resource = exists %s, desired %s", pp.Sprint(exists), pp.Sprint(desired)))
+		if err := r.Update(ctx, desired); err != nil {
+			log.Error(err, "failed to update resource")
+			return ctrl.Result{}, err
 		}
 	}
 
