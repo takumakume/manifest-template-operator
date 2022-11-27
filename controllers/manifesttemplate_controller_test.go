@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -44,12 +45,9 @@ var _ = Describe("ManifestTemplate controller", func() {
 		err = k8sClient.DeleteAllOf(ctx, &corev1.Service{}, client.InNamespace("test"))
 		Expect(err).NotTo(HaveOccurred())
 		time.Sleep(100 * time.Millisecond)
-
-		err = k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test1"}, &corev1.Service{})
-		Expect(err).To(HaveOccurred())
 	})
 
-	It("default", func() {
+	It("create and update", func() {
 		manifestTemplate := &manifesttemplatev1alpha1.ManifestTemplate{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "sample",
@@ -72,6 +70,7 @@ var _ = Describe("ManifestTemplate controller", func() {
 					Object: map[string]interface{}{
 						"ports": []map[string]interface{}{
 							{
+								"name": "http",
 								"port": 80,
 							},
 						},
@@ -95,6 +94,40 @@ var _ = Describe("ManifestTemplate controller", func() {
 		Expect(generated.Spec.Ports[0].Port).Should(Equal(int32(80)))
 		Expect(generated.Spec.Selector["app"]).Should(Equal("test1"))
 		Expect(generated.Spec.Selector["ns"]).Should(Equal("test"))
+
+		manifestTemplate.Spec.Spec = manifesttemplatev1alpha1.Spec{
+			Object: map[string]interface{}{
+				"ports": []map[string]interface{}{
+					{
+						"name": "http",
+						"port": 80,
+					},
+					{
+						"name": "https",
+						"port": 443,
+					},
+				},
+				"selector": map[string]interface{}{
+					"app": "test1",
+					"ns":  "{{ .Self.ObjectMeta.Namespace }}",
+				},
+			},
+		}
+		Expect(k8sClient.Update(ctx, manifestTemplate)).Should(Succeed())
+
+		Eventually(func() error {
+			o := &corev1.Service{}
+			err := k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test1"}, o)
+			if err != nil {
+				return err
+			}
+
+			if !(len(o.Spec.Ports) == 2 && o.Spec.Ports[1].Port == int32(443)) {
+				return fmt.Errorf("object is not updated = %+v", o)
+			}
+
+			return nil
+		}, 5, 1).Should(Succeed())
 	})
 
 	It("manifest valid", func() {
@@ -159,6 +192,7 @@ func Test_desireUnstructured(t *testing.T) {
 							Object: map[string]interface{}{
 								"ports": []map[string]interface{}{
 									{
+										"name": "http",
 										"port": 80,
 									},
 								},
@@ -195,6 +229,7 @@ func Test_desireUnstructured(t *testing.T) {
 					"spec": map[string]interface{}{
 						"ports": []interface{}{
 							map[string]interface{}{
+								"name": "http",
 								"port": 80,
 							},
 						},

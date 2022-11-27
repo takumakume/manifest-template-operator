@@ -16,7 +16,8 @@ spec:
       annotation1: annotation1value
   spec:
     ports:
-    - port: 80
+    - name: "http"
+      port: 80
     selector:
       app: test1
       ns: "{{ .Self.ObjectMeta.Namespace }}"
