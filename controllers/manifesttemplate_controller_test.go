@@ -95,7 +95,12 @@ var _ = Describe("ManifestTemplate controller", func() {
 		Expect(generated.Spec.Selector["app"]).Should(Equal("test1"))
 		Expect(generated.Spec.Selector["ns"]).Should(Equal("test"))
 
-		manifestTemplate.Spec.Spec = manifesttemplatev1alpha1.Spec{
+		new1ManifestTemplate := manifestTemplate.DeepCopy()
+		new1ManifestTemplate.ObjectMeta.Annotations = map[string]string{"a": "aa"}
+		Expect(k8sClient.Patch(ctx, new1ManifestTemplate, client.MergeFrom(manifestTemplate))).Should(Succeed())
+
+		new2ManifestTemplate := new1ManifestTemplate.DeepCopy()
+		new2ManifestTemplate.Spec.Spec = manifesttemplatev1alpha1.Spec{
 			Object: map[string]interface{}{
 				"ports": []map[string]interface{}{
 					{
@@ -113,7 +118,7 @@ var _ = Describe("ManifestTemplate controller", func() {
 				},
 			},
 		}
-		Expect(k8sClient.Update(ctx, manifestTemplate)).Should(Succeed())
+		Expect(k8sClient.Patch(ctx, new2ManifestTemplate, client.MergeFrom(new1ManifestTemplate))).Should(Succeed())
 
 		Eventually(func() error {
 			o := &corev1.Service{}
@@ -122,7 +127,7 @@ var _ = Describe("ManifestTemplate controller", func() {
 				return err
 			}
 
-			if !(len(o.Spec.Ports) == 2 && o.Spec.Ports[1].Port == int32(443)) {
+			if !(len(o.Spec.Ports) == 2 && o.Spec.Ports[1].Port == int32(4413)) {
 				return fmt.Errorf("object is not updated = %+v", o)
 			}
 
@@ -210,16 +215,6 @@ func Test_desireUnstructured(t *testing.T) {
 			want: &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"metadata": map[string]interface{}{
-						"ownerReferences": []metav1.OwnerReference{
-							{
-								APIVersion:         "manifest-template.takumakume.github.io/v1alpha1",
-								Kind:               "ManifestTemplate",
-								Name:               "sample",
-								UID:                "",
-								Controller:         &True,
-								BlockOwnerDeletion: &True,
-							},
-						},
 						"name":      "test1",
 						"namespace": "test",
 						"labels": map[string]string{

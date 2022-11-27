@@ -21,10 +21,13 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"reflect"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/k0kubun/pp"
 	manifesttemplatev1alpha1 "github.com/takumakume/manifest-template-operator/api/v1alpha1"
@@ -95,6 +97,18 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		Kind:    manifestTemplate.Spec.Kind,
 		Version: version,
 	})
+
+	ownerRef := metav1.NewControllerRef(
+		&manifestTemplate.ObjectMeta,
+		schema.GroupVersionKind{
+			Group:   manifesttemplatev1alpha1.GroupVersion.Group,
+			Version: manifesttemplatev1alpha1.GroupVersion.Version,
+			Kind:    "ManifestTemplate",
+		})
+	ownerRef.Name = manifestTemplate.Name
+	ownerRef.UID = manifestTemplate.GetUID()
+	exists.SetOwnerReferences([]metav1.OwnerReference{*ownerRef})
+
 	objKey := client.ObjectKey{
 		Namespace: desired.GetNamespace(),
 		Name:      desired.GetName(),
@@ -106,15 +120,47 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				log.Error(err, "failed to create resource")
 				return ctrl.Result{}, err
 			}
+
 		} else {
 			return ctrl.Result{}, err
 		}
 	} else {
-		log.Info(fmt.Sprintf("update resource = exists %s, desired %s", pp.Sprint(exists), pp.Sprint(desired)))
+		if manifestTemplate.Status.LastAppliedConfigration != "" {
+			lastAppliedConfigration := &unstructured.Unstructured{}
+			if err := yaml.Unmarshal([]byte(manifestTemplate.Status.LastAppliedConfigration), lastAppliedConfigration); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			// TODO: Change metadata.Name or Namespace -> recreate
+
+			if reflect.DeepEqual(lastAppliedConfigration, desired) {
+				log.Info("resource up to date")
+				return ctrl.Result{}, nil
+			}
+		}
+		log.Info(fmt.Sprintf("update resource = desired %s", pp.Sprint(desired)))
+
 		if err := r.Update(ctx, desired); err != nil {
 			log.Error(err, "failed to update resource")
 			return ctrl.Result{}, err
 		}
+	}
+
+	mt := manifestTemplate.DeepCopy()
+	mt.Status.Ready = v1.ConditionTrue
+	lastDesired, err := desireUnstructured(manifestTemplate)
+	if err != nil {
+		log.Error(err, "failed to render object")
+		return ctrl.Result{}, err
+	}
+	raw, err := yaml.Marshal(lastDesired)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	mt.Status.LastAppliedConfigration = string(raw)
+	if err := r.Status().Patch(ctx, mt, client.MergeFrom(manifestTemplate)); err != nil {
+		log.Error(err, "failed to patch ManifestTemplate status")
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
@@ -128,16 +174,6 @@ func (r *ManifestTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func desireUnstructured(manifestTemplate *manifesttemplatev1alpha1.ManifestTemplate) (*unstructured.Unstructured, error) {
-	ownerRef := metav1.NewControllerRef(
-		&manifestTemplate.ObjectMeta,
-		schema.GroupVersionKind{
-			Group:   manifesttemplatev1alpha1.GroupVersion.Group,
-			Version: manifesttemplatev1alpha1.GroupVersion.Version,
-			Kind:    "ManifestTemplate",
-		})
-	ownerRef.Name = manifestTemplate.Name
-	ownerRef.UID = manifestTemplate.GetUID()
-
 	u := &unstructured.Unstructured{}
 
 	render := newRender(manifestTemplate)
@@ -193,9 +229,6 @@ func desireUnstructured(manifestTemplate *manifesttemplatev1alpha1.ManifestTempl
 			"namespace":   namespace,
 			"labels":      labels,
 			"annotations": annotations,
-			"ownerReferences": []metav1.OwnerReference{
-				*ownerRef,
-			},
 		},
 		"spec": spec,
 	}
@@ -208,7 +241,17 @@ func desireUnstructured(manifestTemplate *manifesttemplatev1alpha1.ManifestTempl
 		Version: version,
 	})
 
-	return u, nil
+	// WORKAROUND: To make yaml once because the order of map[string]interface is changed when comparing with lastAppliedConfigration.
+	rawNew, err := yaml.Marshal(u)
+	if err != nil {
+		return nil, err
+	}
+	new := &unstructured.Unstructured{}
+	if err := yaml.Unmarshal([]byte(rawNew), &new); err != nil {
+		return nil, err
+	}
+
+	return new, nil
 }
 
 func getGroupVersion(apiVersion string) (string, string) {

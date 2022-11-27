@@ -104,6 +104,9 @@ type ManifestTemplateSpecMeta struct {
 type ManifestTemplateStatus struct {
 	// Ready is the manifest application state
 	Ready corev1.ConditionStatus `json:"ready,omitempty"`
+
+	// LastAppliedConfigration is the applied manifests
+	LastAppliedConfigration string `json:"lastAppliedConfigration,omitempty"`
 }
 
 //+kubebuilder:object:root=true
