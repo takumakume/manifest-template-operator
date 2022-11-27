@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -74,18 +75,21 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	if !manifestTemplate.GetDeletionTimestamp().IsZero() {
+		log.Info("skip reconcile loop")
+		return ctrl.Result{}, nil
+	}
+
 	log.Info("starting reconcile loop")
-	log.Info(pp.Sprint(manifestTemplate))
+	defer log.Info("finish reconcile loop")
 
 	desired, err := desireUnstructured(manifestTemplate)
 	if err != nil {
+		log.Error(err, "failed to render object")
 		return ctrl.Result{}, err
 	}
 
-	log.Info(pp.Sprint(desired))
-
 	group, version := getGroupVersion(manifestTemplate.Spec.APIVersion)
-
 	exists := &unstructured.Unstructured{}
 	exists.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   group,
@@ -98,23 +102,25 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 	if err := r.Get(ctx, objKey, exists); err != nil {
 		if apierrors.IsNotFound(err) {
-			// create
-			log.Info(fmt.Sprintf("======== try create: %+v", pp.Sprint(desired)))
+			log.Info(fmt.Sprintf("create resource = %s", pp.Sprint(desired)))
 			if err := r.Create(ctx, desired); err != nil {
+				log.Error(err, "failed to create resource")
 				return ctrl.Result{}, err
 			}
-			log.Info("======== created")
 		} else {
 			return ctrl.Result{}, err
 		}
 	} else {
-		// update
-		log.Info(fmt.Sprintf("======== exists: %+v", pp.Sprint(exists)))
-		log.Info(fmt.Sprintf("======== try update: %+v", pp.Sprint(desired)))
-		if err := r.Update(ctx, desired); err != nil {
-			return ctrl.Result{}, err
+		if equality.Semantic.DeepEqual(exists, desired) {
+			log.Info("resource up to date")
+			return ctrl.Result{}, nil
+		} else {
+			log.Info(fmt.Sprintf("update resource = %s", pp.Sprint(desired)))
+			if err := r.Update(ctx, desired); err != nil {
+				log.Error(err, "failed to update resource")
+				return ctrl.Result{}, err
+			}
 		}
-		log.Info("======== updated")
 	}
 
 	return ctrl.Result{}, nil
