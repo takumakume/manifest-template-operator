@@ -57,7 +57,7 @@ var _ = Describe("ManifestTemplate controller", func() {
 				Kind:       "Service",
 				APIVersion: "v1",
 				Metadata: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
-					Name:      "test1",
+					Name:      "{{ .Self.ObjectMeta.Namespace }}1",
 					Namespace: "{{ .Self.ObjectMeta.Namespace }}",
 					Labels: map[string]string{
 						"label1": "label1value",
@@ -179,13 +179,15 @@ func Test_desireUnstructured(t *testing.T) {
 						Kind:       "Service",
 						APIVersion: "v1",
 						Metadata: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
-							Name:      "test1",
-							Namespace: "test",
+							Name:      "{{ .Self.ObjectMeta.Namespace }}1",
+							Namespace: "{{ .Self.ObjectMeta.Namespace }}",
 							Labels: map[string]string{
 								"label1": "label1value",
+								"ns":     "{{ .Self.ObjectMeta.Namespace }}",
 							},
 							Annotations: map[string]string{
 								"annotation1": "annotation1value",
+								"ns":          "{{ .Self.ObjectMeta.Namespace }}",
 							},
 						},
 						Spec: manifesttemplatev1alpha1.Spec{
@@ -198,6 +200,7 @@ func Test_desireUnstructured(t *testing.T) {
 								},
 								"selector": map[string]interface{}{
 									"app": "test1",
+									"ns":  "{{ .Self.ObjectMeta.Namespace }}",
 								},
 							},
 						},
@@ -221,9 +224,11 @@ func Test_desireUnstructured(t *testing.T) {
 						"namespace": "test",
 						"labels": map[string]string{
 							"label1": "label1value",
+							"ns":     "test",
 						},
 						"annotations": map[string]string{
 							"annotation1": "annotation1value",
+							"ns":          "test",
 						},
 					},
 					"spec": map[string]interface{}{
@@ -235,6 +240,7 @@ func Test_desireUnstructured(t *testing.T) {
 						},
 						"selector": map[string]interface{}{
 							"app": "test1",
+							"ns":  "test",
 						},
 					},
 					"apiVersion": "v1",
