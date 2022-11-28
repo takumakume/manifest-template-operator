@@ -1,94 +1,144 @@
 # manifest-template-operator
-// TODO(user): Add simple overview of use/purpose
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+An operator that generates any CRD using go-template.
 
-## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+## Sample manifest
 
-### Running on the cluster
-1. Install Instances of Custom Resources:
+### `ManifestTemplate`
 
-```sh
-kubectl apply -f config/samples/
+```yaml
+apiVersion: manifest-template.takumakume.github.io/v1alpha1
+kind: ManifestTemplate
+metadata:
+  name: sample-svc
+  namespace: test
+spec:
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: sample-svc
+    namespace: "{{ .Self.ObjectMeta.Namespace }}"
+    labels:
+      label1: label1value
+    annotations:
+      annotation1: annotation1value
+  spec:
+    ports:
+    - name: "http"
+      port: 80
+    selector:
+      app: test1
+      ns: "{{ .Self.ObjectMeta.Namespace }}"
 ```
 
-2. Build and push your image to the location specified by `IMG`:
-	
-```sh
-make docker-build docker-push IMG=<some-registry>/manifest-template-operator:tag
-```
-	
-3. Deploy the controller to the cluster with the image specified by `IMG`:
+### Generated resource
 
-```sh
-make deploy IMG=<some-registry>/manifest-template-operator:tag
-```
-
-### Uninstall CRDs
-To delete the CRDs from the cluster:
-
-```sh
-make uninstall
-```
-
-### Undeploy controller
-UnDeploy the controller to the cluster:
-
-```sh
-make undeploy
-```
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-### How it works
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
-
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/) 
-which provides a reconcile function responsible for synchronizing resources untile the desired state is reached on the cluster 
-
-### Test It Out
-1. Install the CRDs into the cluster:
-
-```sh
-make install
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-svc
+  namespace: test
+  annotations:
+    annotation1: annotation1value
+    ns: test
+  labels:
+    label1: label1value
+    ns: test
+  ownerReferences:
+  - apiVersion: manifest-template.takumakume.github.io/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ManifestTemplate
+    name: sample
+    uid: "xxx"
+spec:
+  ports:
+  - name: http
+    port: 80
+  selector:
+    app: test1
+    ns: test
 ```
 
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
+## Variables for go-template
+
+### `.Self`
+
+The variable `.Self` used in the template is the ManifestTemplate resource itself.
+
+For example, if you need the namespace where the ManifestTemplate is deployed, you can access it like `.Self.Metadata.Namespace` .
+
+## Use case
+
+- Embed namespace identifier when deploying the same manifests to multiple namespaces
+  - Embed namespace name in part of hostname such as Ingress, HTTPRoute resources
+    ```yaml
+    # example: Ingress resource template
+    ---
+    apiVersion: manifest-template.takumakume.github.io/v1alpha1
+    kind: ManifestTemplate
+    metadata:
+      name: sample-ingress
+      namespace: test
+    spec:
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: example
+        namespace: test
+      spec:
+      tls:
+      - hosts:
+        - "app-{{ .Self.ObjectMeta.Namespace }}.example.com"
+        secretName: example-com-tls
+      rules:
+      - host: "app-{{ .Self.ObjectMeta.Namespace }}.example.com"
+        http:
+        paths:
+        - backend:
+          service:
+            name: example
+            port:
+              number: 80
+          path: /
+          pathType: Prefix
+    ```
+    ```yaml
+    # example: ManifestTemplate resource template
+    ---
+    apiVersion: manifest-template.takumakume.github.io/v1alpha1
+    kind: ManifestTemplate
+    metadata:
+      name: sample-httproute
+      namespace: test
+    apiVersion: gateway.networking.k8s.io/v1beta1
+    kind: HTTPRoute
+    metadata:
+      name: httproute
+    spec:
+      parentRefs:
+      - name: gateway
+        namespace: istio-system
+      hostnames: ["app-{{ .Self.ObjectMeta.Namespace }}.example.com"]
+      rules:
+      - matches:
+        - path:
+            type: PathPrefix
+            value: /
+        backendRefs:
+        - name: sample-app
+          port: 80
+    ```
+
+## Install
+
+### Using Helm
 
 ```sh
-make run
+$ helm repo add manifest-template-operator https://takumakume.github.io/manifest-template-operator/charts
+$ helm repo update
+$ helm install --create-namespace --namespace manifest-template-operator-system manifest-template-operator manifest-template-operator/manifest-template-operator
 ```
 
-**NOTE:** You can also run this in one step by running: `make install run`
-
-### Modifying the API definitions
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
-
-```sh
-make manifests
-```
-
-**NOTE:** Run `make --help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
-
-Copyright 2022.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
+Values: ref [charts/manifest-template-operator/values.yaml](https://github.com/takumakume/manifest-template-operator/blob/main/charts/manifest-template-operator/values.yaml)
