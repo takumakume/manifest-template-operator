@@ -15,6 +15,7 @@ metadata:
 spec:
   apiVersion: v1
   kind: Service
+  # `.spec.metadata` and `.spec.spec` can all use the go-template syntax.
   metadata:
     name: sample-svc
     namespace: "{{ .Self.ObjectMeta.Namespace }}"
