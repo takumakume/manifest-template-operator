@@ -171,7 +171,7 @@ $(YQ):
 	  | tar -C $(LOCALBIN) -xz
 
 .PHONY: helm-chart
-helm-chart: maifests
+helm-chart: manifests
 	cd charts && helm package manifest-template-operator && helm repo index .
 
 .PHONY: ci-deps
