@@ -94,7 +94,6 @@ var _ = Describe("ManifestTemplate controller", func() {
 			}
 			return nil
 		}, 5, 1).Should(Succeed())
-		Expect(events.Items[0].Reason).Should(Equal("Created"))
 
 		generated := &corev1.Service{}
 		Eventually(func() error {
@@ -152,7 +151,6 @@ var _ = Describe("ManifestTemplate controller", func() {
 			}
 			return nil
 		}, 5, 1).Should(Succeed())
-		Expect(events.Items[1].Reason).Should(Equal("Updated"))
 
 		new2ManifestTemplate := new1ManifestTemplate.DeepCopy()
 		new2ManifestTemplate.Spec.Spec = manifesttemplatev1alpha1.Spec{
@@ -203,7 +201,6 @@ var _ = Describe("ManifestTemplate controller", func() {
 			}
 			return nil
 		}, 5, 1).Should(Succeed())
-		Expect(events.Items[2].Reason).Should(Equal("Updated"))
 	})
 
 	It("manifest valid", func() {
