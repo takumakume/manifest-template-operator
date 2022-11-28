@@ -20,3 +20,14 @@ jobs:
         go-version: ${{ env.go-version }}
     - run: make ci-deps
     - run: make test
+    - run: make helm-chart
+  test-helm-chart:
+    name: Run helm chart generate tests
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v3
+      with:
+        go-version: ${{ env.go-version }}
+    - run: make ci-deps
+    - run: make helm-chart
