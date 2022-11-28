@@ -21,10 +21,8 @@ import (
 	"context"
 	"fmt"
 	"html/template"
-	"reflect"
-	"strings"
 
-	"gopkg.in/yaml.v3"
+	"github.com/ghodss/yaml"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,30 +82,20 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	log.Info("starting reconcile loop")
 	defer log.Info("finish reconcile loop")
 
-	desired, err := desireUnstructured(manifestTemplate)
+	rawDesiredYAML, err := desiredYAML(manifestTemplate)
 	if err != nil {
 		log.Error(err, "failed to render object")
 		return ctrl.Result{}, err
 	}
 
-	group, version := getGroupVersion(manifestTemplate.Spec.APIVersion)
-	exists := &unstructured.Unstructured{}
-	exists.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   group,
-		Kind:    manifestTemplate.Spec.Kind,
-		Version: version,
-	})
+	desired := &unstructured.Unstructured{}
+	if err := yaml.Unmarshal([]byte(rawDesiredYAML), desired); err != nil {
+		return ctrl.Result{}, err
+	}
 
-	ownerRef := metav1.NewControllerRef(
-		&manifestTemplate.ObjectMeta,
-		schema.GroupVersionKind{
-			Group:   manifesttemplatev1alpha1.GroupVersion.Group,
-			Version: manifesttemplatev1alpha1.GroupVersion.Version,
-			Kind:    "ManifestTemplate",
-		})
-	ownerRef.Name = manifestTemplate.Name
-	ownerRef.UID = manifestTemplate.GetUID()
-	exists.SetOwnerReferences([]metav1.OwnerReference{*ownerRef})
+	exists := &unstructured.Unstructured{}
+	exists.SetAPIVersion(manifestTemplate.Spec.APIVersion)
+	exists.SetKind(manifestTemplate.Spec.Kind)
 
 	objKey := client.ObjectKey{
 		Namespace: desired.GetNamespace(),
@@ -116,6 +104,7 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if err := r.Get(ctx, objKey, exists); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Info(fmt.Sprintf("create resource = %s", pp.Sprint(desired)))
+
 			if err := r.Create(ctx, desired); err != nil {
 				log.Error(err, "failed to create resource")
 				return ctrl.Result{}, err
@@ -126,17 +115,12 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	} else {
 		if manifestTemplate.Status.LastAppliedConfigration != "" {
-			lastAppliedConfigration := &unstructured.Unstructured{}
-			if err := yaml.Unmarshal([]byte(manifestTemplate.Status.LastAppliedConfigration), lastAppliedConfigration); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			// TODO: Change metadata.Name or Namespace -> recreate
-
-			if reflect.DeepEqual(lastAppliedConfigration, desired) {
+			if manifestTemplate.Status.LastAppliedConfigration == rawDesiredYAML {
 				log.Info("resource up to date")
 				return ctrl.Result{}, nil
 			}
+
+			// TODO: Change metadata.Name or Namespace -> recreate
 		}
 		log.Info(fmt.Sprintf("update resource = desired %s", pp.Sprint(desired)))
 
@@ -148,16 +132,7 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	mt := manifestTemplate.DeepCopy()
 	mt.Status.Ready = v1.ConditionTrue
-	lastDesired, err := desireUnstructured(manifestTemplate)
-	if err != nil {
-		log.Error(err, "failed to render object")
-		return ctrl.Result{}, err
-	}
-	raw, err := yaml.Marshal(lastDesired)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	mt.Status.LastAppliedConfigration = string(raw)
+	mt.Status.LastAppliedConfigration = rawDesiredYAML
 	if err := r.Status().Patch(ctx, mt, client.MergeFrom(manifestTemplate)); err != nil {
 		log.Error(err, "failed to patch ManifestTemplate status")
 		return ctrl.Result{}, err
@@ -173,97 +148,38 @@ func (r *ManifestTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func desireUnstructured(manifestTemplate *manifesttemplatev1alpha1.ManifestTemplate) (*unstructured.Unstructured, error) {
+func desiredYAML(manifestTemplate *manifesttemplatev1alpha1.ManifestTemplate) (string, error) {
 	u := &unstructured.Unstructured{}
+	u.SetKind(manifestTemplate.Spec.Kind)
+	u.SetAPIVersion(manifestTemplate.Spec.APIVersion)
+	u.SetName(manifestTemplate.Spec.Metadata.Name)
+	u.SetNamespace(manifestTemplate.Spec.Metadata.Namespace)
+	u.SetLabels(manifestTemplate.Spec.Metadata.Labels)
+	u.SetAnnotations(manifestTemplate.Spec.Metadata.Annotations)
 
-	render := newRender(manifestTemplate)
+	ownerRef := metav1.NewControllerRef(
+		&manifestTemplate.ObjectMeta,
+		schema.GroupVersionKind{
+			Group:   manifesttemplatev1alpha1.GroupVersion.Group,
+			Version: manifesttemplatev1alpha1.GroupVersion.Version,
+			Kind:    "ManifestTemplate",
+		})
+	ownerRef.Name = manifestTemplate.GetName()
+	ownerRef.UID = manifestTemplate.GetUID()
+	u.SetOwnerReferences([]metav1.OwnerReference{*ownerRef})
 
-	name, err := render.render(manifestTemplate.Spec.Metadata.Name)
+	u.Object["spec"] = manifestTemplate.Spec.Spec.Object
+
+	yamlBuf, err := yaml.Marshal(u)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-
-	namespace, err := render.render(manifestTemplate.Spec.Metadata.Namespace)
+	renderdStr, err := newRender(manifestTemplate).render(string(yamlBuf))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	labels := map[string]string{}
-	if len(manifestTemplate.Spec.Metadata.Labels) > 0 {
-		for k, v := range manifestTemplate.Spec.Metadata.Labels {
-			if o, err := render.render(v); err == nil {
-				labels[k] = o
-			} else {
-				return nil, err
-			}
-		}
-	}
-
-	annotations := map[string]string{}
-	if len(manifestTemplate.Spec.Metadata.Annotations) > 0 {
-		for k, v := range manifestTemplate.Spec.Metadata.Annotations {
-			if o, err := render.render(v); err == nil {
-				annotations[k] = o
-			} else {
-				return nil, err
-			}
-		}
-	}
-
-	raw, err := yaml.Marshal(manifestTemplate.Spec.Spec.Object)
-	if err != nil {
-		return nil, err
-	}
-	renderd, err := render.render(string(raw))
-	if err != nil {
-		return nil, err
-	}
-	spec := map[string]interface{}{}
-	if err := yaml.Unmarshal([]byte(renderd), &spec); err != nil {
-		return nil, err
-	}
-
-	u.Object = map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"name":        name,
-			"namespace":   namespace,
-			"labels":      labels,
-			"annotations": annotations,
-		},
-		"spec": spec,
-	}
-
-	group, version := getGroupVersion(manifestTemplate.Spec.APIVersion)
-
-	u.SetGroupVersionKind(schema.GroupVersionKind{
-		Kind:    manifestTemplate.Spec.Kind,
-		Group:   group,
-		Version: version,
-	})
-
-	// WORKAROUND: To make yaml once because the order of map[string]interface is changed when comparing with lastAppliedConfigration.
-	rawNew, err := yaml.Marshal(u)
-	if err != nil {
-		return nil, err
-	}
-	new := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(rawNew), &new); err != nil {
-		return nil, err
-	}
-
-	return new, nil
-}
-
-func getGroupVersion(apiVersion string) (string, string) {
-	group := ""
-	version := ""
-	s := strings.Split(apiVersion, "/")
-	if len(s) != 1 {
-		group = s[0]
-	}
-	version = s[len(s)-1]
-
-	return group, version
+	return renderdStr, nil
 }
 
 type Render struct {

@@ -25,13 +25,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k0kubun/pp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	manifesttemplatev1alpha1 "github.com/takumakume/manifest-template-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -96,11 +94,7 @@ var _ = Describe("ManifestTemplate controller", func() {
 		Expect(generated.Spec.Selector["ns"]).Should(Equal("test"))
 
 		new1ManifestTemplate := manifestTemplate.DeepCopy()
-		new1ManifestTemplate.ObjectMeta.Annotations = map[string]string{"a": "aa"}
-		Expect(k8sClient.Patch(ctx, new1ManifestTemplate, client.MergeFrom(manifestTemplate))).Should(Succeed())
-
-		new2ManifestTemplate := new1ManifestTemplate.DeepCopy()
-		new2ManifestTemplate.Spec.Spec = manifesttemplatev1alpha1.Spec{
+		new1ManifestTemplate.Spec.Spec = manifesttemplatev1alpha1.Spec{
 			Object: map[string]interface{}{
 				"ports": []map[string]interface{}{
 					{
@@ -118,17 +112,56 @@ var _ = Describe("ManifestTemplate controller", func() {
 				},
 			},
 		}
-		Expect(k8sClient.Patch(ctx, new2ManifestTemplate, client.MergeFrom(new1ManifestTemplate))).Should(Succeed())
+		Expect(k8sClient.Patch(ctx, new1ManifestTemplate, client.MergeFrom(manifestTemplate))).Should(Succeed())
 
+		updated1 := &corev1.Service{}
 		Eventually(func() error {
-			o := &corev1.Service{}
-			err := k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test1"}, o)
+			err := k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test1"}, updated1)
 			if err != nil {
 				return err
 			}
 
-			if !(len(o.Spec.Ports) == 2 && o.Spec.Ports[1].Port == int32(4413)) {
-				return fmt.Errorf("object is not updated = %+v", o)
+			if !(len(updated1.Spec.Ports) == 2 && updated1.Spec.Ports[1].Port == int32(443)) {
+				return fmt.Errorf("object is not updated = %+v", updated1)
+			}
+
+			return nil
+		}, 5, 1).Should(Succeed())
+
+		new2ManifestTemplate := new1ManifestTemplate.DeepCopy()
+		new2ManifestTemplate.Spec.Spec = manifesttemplatev1alpha1.Spec{
+			Object: map[string]interface{}{
+				"ports": []map[string]interface{}{
+					{
+						"name": "http",
+						"port": 80,
+					},
+					{
+						"name": "https",
+						"port": 443,
+					},
+					{
+						"name": "healthz",
+						"port": 8081,
+					},
+				},
+				"selector": map[string]interface{}{
+					"app": "test1",
+					"ns":  "{{ .Self.ObjectMeta.Namespace }}",
+				},
+			},
+		}
+		Expect(k8sClient.Patch(ctx, new2ManifestTemplate, client.MergeFrom(new1ManifestTemplate))).Should(Succeed())
+
+		updated2 := &corev1.Service{}
+		Eventually(func() error {
+			err := k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test1"}, updated2)
+			if err != nil {
+				return err
+			}
+
+			if !(len(updated2.Spec.Ports) == 3 && updated2.Spec.Ports[2].Port == int32(8081)) {
+				return fmt.Errorf("object is not updated = %+v", updated2)
 			}
 
 			return nil
@@ -162,14 +195,14 @@ var _ = Describe("ManifestTemplate controller", func() {
 	})
 })
 
-func Test_desireUnstructured(t *testing.T) {
+func Test_desiredYAML(t *testing.T) {
 	type args struct {
 		manifestTemplate *manifesttemplatev1alpha1.ManifestTemplate
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    *unstructured.Unstructured
+		want    string
 		wantErr bool
 	}{
 		{
@@ -212,47 +245,43 @@ func Test_desireUnstructured(t *testing.T) {
 					},
 				},
 			},
-			want: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"metadata": map[string]interface{}{
-						"name":      "test1",
-						"namespace": "test",
-						"labels": map[string]string{
-							"label1": "label1value",
-							"ns":     "test",
-						},
-						"annotations": map[string]string{
-							"annotation1": "annotation1value",
-							"ns":          "test",
-						},
-					},
-					"spec": map[string]interface{}{
-						"ports": []interface{}{
-							map[string]interface{}{
-								"name": "http",
-								"port": 80,
-							},
-						},
-						"selector": map[string]interface{}{
-							"app": "test1",
-							"ns":  "test",
-						},
-					},
-					"apiVersion": "v1",
-					"kind":       "Service",
-				},
-			},
+			want: `apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    annotation1: annotation1value
+    ns: 'test'
+  labels:
+    label1: label1value
+    ns: 'test'
+  name: 'test1'
+  namespace: 'test'
+  ownerReferences:
+  - apiVersion: manifest-template.takumakume.github.io/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ManifestTemplate
+    name: sample
+    uid: ""
+spec:
+  ports:
+  - name: http
+    port: 80
+  selector:
+    app: test1
+    ns: 'test'
+`,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := desireUnstructured(tt.args.manifestTemplate)
+			got, err := desiredYAML(tt.args.manifestTemplate)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("desireUnstructured() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("desiredYAML() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("desireUnstructured() = %v, want %v", pp.Sprint(got), pp.Sprint(tt.want))
+				t.Errorf("desiredYAML() = %s, want %s", got, tt.want)
 			}
 		})
 	}
