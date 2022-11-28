@@ -24,11 +24,12 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/tools/record"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -44,11 +45,14 @@ import (
 type ManifestTemplateReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+
+	recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=manifest-template.takumakume.github.io,resources=manifesttemplates,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=manifest-template.takumakume.github.io,resources=manifesttemplates/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=manifest-template.takumakume.github.io,resources=manifesttemplates/finalizers,verbs=update
+//+kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -110,6 +114,7 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				return ctrl.Result{}, err
 			}
 
+			r.recorder.Event(manifestTemplate, corev1.EventTypeNormal, "Created", fmt.Sprintf("created resource = desired %s", rawDesiredYAML))
 		} else {
 			return ctrl.Result{}, err
 		}
@@ -128,10 +133,12 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			log.Error(err, "failed to update resource")
 			return ctrl.Result{}, err
 		}
+
+		r.recorder.Event(manifestTemplate, corev1.EventTypeNormal, "Updated", fmt.Sprintf("updated resource = desired %s", rawDesiredYAML))
 	}
 
 	mt := manifestTemplate.DeepCopy()
-	mt.Status.Ready = v1.ConditionTrue
+	mt.Status.Ready = corev1.ConditionTrue
 	mt.Status.LastAppliedConfigration = rawDesiredYAML
 	if err := r.Status().Patch(ctx, mt, client.MergeFrom(manifestTemplate)); err != nil {
 		log.Error(err, "failed to patch ManifestTemplate status")
@@ -143,6 +150,8 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ManifestTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.recorder = mgr.GetEventRecorderFor("manifest-template-controller")
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&manifesttemplatev1alpha1.ManifestTemplate{}).
 		Complete(r)

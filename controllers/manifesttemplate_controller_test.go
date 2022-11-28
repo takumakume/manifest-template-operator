@@ -42,6 +42,8 @@ var _ = Describe("ManifestTemplate controller", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = k8sClient.DeleteAllOf(ctx, &corev1.Service{}, client.InNamespace("test"))
 		Expect(err).NotTo(HaveOccurred())
+		err = k8sClient.DeleteAllOf(ctx, &corev1.Event{}, client.InNamespace("test"))
+		Expect(err).NotTo(HaveOccurred())
 		time.Sleep(100 * time.Millisecond)
 	})
 
@@ -81,6 +83,18 @@ var _ = Describe("ManifestTemplate controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, manifestTemplate)).Should(Succeed())
+
+		events := &corev1.EventList{}
+		Eventually(func() error {
+			k8sClient.List(ctx, events, &client.ListOptions{
+				Namespace: manifestTemplate.GetNamespace(),
+			})
+			if len(events.Items) != 1 {
+				return fmt.Errorf("no events have been added")
+			}
+			return nil
+		}, 5, 1).Should(Succeed())
+		Expect(events.Items[0].Reason).Should(Equal("Created"))
 
 		generated := &corev1.Service{}
 		Eventually(func() error {
@@ -128,6 +142,18 @@ var _ = Describe("ManifestTemplate controller", func() {
 			return nil
 		}, 5, 1).Should(Succeed())
 
+		events = &corev1.EventList{}
+		Eventually(func() error {
+			k8sClient.List(ctx, events, &client.ListOptions{
+				Namespace: manifestTemplate.GetNamespace(),
+			})
+			if len(events.Items) != 2 {
+				return fmt.Errorf("no events have been added")
+			}
+			return nil
+		}, 5, 1).Should(Succeed())
+		Expect(events.Items[1].Reason).Should(Equal("Updated"))
+
 		new2ManifestTemplate := new1ManifestTemplate.DeepCopy()
 		new2ManifestTemplate.Spec.Spec = manifesttemplatev1alpha1.Spec{
 			Object: map[string]interface{}{
@@ -166,6 +192,18 @@ var _ = Describe("ManifestTemplate controller", func() {
 
 			return nil
 		}, 5, 1).Should(Succeed())
+
+		events = &corev1.EventList{}
+		Eventually(func() error {
+			k8sClient.List(ctx, events, &client.ListOptions{
+				Namespace: manifestTemplate.GetNamespace(),
+			})
+			if len(events.Items) != 3 {
+				return fmt.Errorf("no events have been added")
+			}
+			return nil
+		}, 5, 1).Should(Succeed())
+		Expect(events.Items[2].Reason).Should(Equal("Updated"))
 	})
 
 	It("manifest valid", func() {
