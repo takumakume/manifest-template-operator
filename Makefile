@@ -172,6 +172,7 @@ $(YQ):
 
 .PHONY: helm-chart
 helm-chart:
+	git merge origin main
 	cd charts && helm package manifest-template-operator && helm repo index .
 
 .PHONY: ci-deps
