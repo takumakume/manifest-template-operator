@@ -1,0 +1,12 @@
+resources:
+  - ../../rbac
+
+namespace: '{{ .Release.Namespace }}'
+
+namePrefix: 'ingress-template-operator-'
+
+commonLabels:
+  app.kubernetes.io/name: ingress-template-operator
+
+transformers:
+  - label-transformer.yaml

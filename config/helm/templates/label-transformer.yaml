@@ -1,0 +1,12 @@
+apiVersion: builtin
+kind: LabelTransformer
+metadata:
+  name: helm-metadata-labels
+labels:
+  helm.sh/chart: '{{ include "manifest-template-operator.chart" . }}'
+  app.kubernetes.io/name: manifest-template-controller
+  app.kubernetes.io/version: '{{ .Chart.AppVersion }}'
+  app.kubernetes.io/managed-by: Helm
+fieldSpecs:
+  - path: metadata/labels
+    create: true

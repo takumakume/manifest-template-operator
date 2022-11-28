@@ -1,0 +1,12 @@
+resources:
+  - ../../crd
+
+namespace: '{{ .Release.Namespace }}'
+
+namePrefix: 'manifest-template-operator-'
+
+commonLabels:
+  app.kubernetes.io/name: manifest-template-operator
+
+transformers:
+  - label-transformer.yaml
