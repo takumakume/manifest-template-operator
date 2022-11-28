@@ -36,37 +36,37 @@ spec:
             description: ManifestTemplateSpec defines the desired state of ManifestTemplate
             properties:
               Metadata:
-                description: Metadata
+                description: Metadata generate manifest metadata
                 properties:
                   annotations:
                     additionalProperties:
                       type: string
-                    description: Annotations
+                    description: Annotations generate manifest metadata.annotations
                     type: object
                   labels:
                     additionalProperties:
                       type: string
-                    description: Labels
+                    description: Labels generate manifest metadata.labels
                     type: object
                   name:
-                    description: Name
+                    description: Name generate manifest metadata.name
                     type: string
                   namespace:
-                    description: Namespace
+                    description: Namespace generate manifest metadata.namespace
                     type: string
                 required:
                 - name
                 - namespace
                 type: object
               Spec:
-                description: Spec
+                description: Spec generate manifest spec
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
               apiVersion:
-                description: APIVersion
+                description: APIVersion generate manifest apiVersion
                 type: string
               kind:
-                description: Kind
+                description: Kind generate manifest kind
                 type: string
             required:
             - Metadata
@@ -78,10 +78,11 @@ spec:
             description: ManifestTemplateStatus defines the observed state of ManifestTemplate
             properties:
               lastAppliedConfigration:
-                description: LastAppliedConfigration is the applied manifests
+                description: LastAppliedConfigration previously generated manifest.
+                  to detect changes to the template
                 type: string
               ready:
-                description: Ready is the manifest application state
+                description: Ready manifests generation status
                 type: string
             type: object
         type: object

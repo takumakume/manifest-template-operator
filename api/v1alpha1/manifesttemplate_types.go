@@ -64,48 +64,48 @@ type ManifestTemplateSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Kind
+	// Kind generate manifest kind
 	// +kubebuilder:validation:Required
 	Kind string `json:"kind"`
 
-	// APIVersion
+	// APIVersion generate manifest apiVersion
 	// +kubebuilder:validation:Required
 	APIVersion string `json:"apiVersion"`
 
-	// Metadata
+	// Metadata generate manifest metadata
 	// +kubebuilder:validation:Required
 	Metadata ManifestTemplateSpecMeta `json:"Metadata"`
 
-	// Spec
+	// Spec generate manifest spec
 	// +kubebuilder:validation:XPreserveUnknownFields
 	// +kubebuilder:validation:Required
 	Spec Spec `json:"Spec"`
 }
 
 type ManifestTemplateSpecMeta struct {
-	// Name
+	// Name generate manifest metadata.name
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Namespace
+	// Namespace generate manifest metadata.namespace
 	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace"`
 
-	// Labels
+	// Labels generate manifest metadata.labels
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// Annotations
+	// Annotations generate manifest metadata.annotations
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // ManifestTemplateStatus defines the observed state of ManifestTemplate
 type ManifestTemplateStatus struct {
-	// Ready is the manifest application state
+	// Ready manifests generation status
 	Ready corev1.ConditionStatus `json:"ready,omitempty"`
 
-	// LastAppliedConfigration is the applied manifests
+	// LastAppliedConfigration previously generated manifest. to detect changes to the template
 	LastAppliedConfigration string `json:"lastAppliedConfigration,omitempty"`
 }
 
