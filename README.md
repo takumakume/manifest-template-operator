@@ -154,7 +154,7 @@ optionalClusterRoleRules: []
   - apiGroups:
       - ""
     resources:
-      - "Service"
+      - services
     verbs:
       - create
       - patch
