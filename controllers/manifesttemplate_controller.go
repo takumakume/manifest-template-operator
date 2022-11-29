@@ -172,7 +172,11 @@ func desiredYAML(manifestTemplate *manifesttemplatev1alpha1.ManifestTemplate) (s
 	u.SetKind(manifestTemplate.Spec.Kind)
 	u.SetAPIVersion(manifestTemplate.Spec.APIVersion)
 	u.SetName(manifestTemplate.Spec.Metadata.Name)
-	u.SetNamespace(manifestTemplate.Spec.Metadata.Namespace)
+	if manifestTemplate.Spec.Metadata.Namespace != "" {
+		u.SetNamespace(manifestTemplate.Spec.Metadata.Namespace)
+	} else {
+		u.SetNamespace(manifestTemplate.ObjectMeta.Namespace)
+	}
 	u.SetLabels(manifestTemplate.Spec.Metadata.Labels)
 	u.SetAnnotations(manifestTemplate.Spec.Metadata.Annotations)
 

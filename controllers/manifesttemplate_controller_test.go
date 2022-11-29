@@ -372,6 +372,57 @@ spec:
     ns: 'test'
 `,
 		},
+		{
+			name: "default namespace",
+			args: args{
+				manifestTemplate: &manifesttemplatev1alpha1.ManifestTemplate{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "sample",
+						Namespace: "test",
+					},
+					Spec: manifesttemplatev1alpha1.ManifestTemplateSpec{
+						Kind:       "Service",
+						APIVersion: "v1",
+						Metadata: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
+							Name: "test1",
+							// add default namespace
+						},
+						Spec: manifesttemplatev1alpha1.Spec{
+							Object: map[string]interface{}{
+								"ports": []map[string]interface{}{
+									{
+										"name": "http",
+										"port": 80,
+									},
+								},
+								"selector": map[string]interface{}{
+									"app": "test1",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: `apiVersion: v1
+kind: Service
+metadata:
+  name: test1
+  namespace: test
+  ownerReferences:
+  - apiVersion: manifest-template.takumakume.github.io/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ManifestTemplate
+    name: sample
+    uid: ""
+spec:
+  ports:
+  - name: http
+    port: 80
+  selector:
+    app: test1
+`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -88,7 +88,7 @@ type ManifestTemplateSpecMeta struct {
 	Name string `json:"name"`
 
 	// Namespace generate manifest metadata.namespace
-	// +kubebuilder:validation:Required
+	// +optional
 	Namespace string `json:"namespace"`
 
 	// Labels generate manifest metadata.labels

@@ -56,7 +56,6 @@ spec:
                     type: string
                 required:
                 - name
-                - namespace
                 type: object
               Spec:
                 description: Spec generate manifest spec
