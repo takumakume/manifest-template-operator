@@ -70,6 +70,16 @@ The variable `.Self` used in the template is the ManifestTemplate resource itsel
 
 For example, if you need the namespace where the ManifestTemplate is deployed, you can access it like `.Self.Metadata.Namespace` .
 
+## Annotations
+
+### `manifest-template.takumakume.github.io/allow-update-already-exists`
+
+If this annotation is given, the resource will be updated even if it already exists.
+In this case, don't give ownerRef.
+This option is not normally used.
+
+Value: `true` or empty
+
 ## Use case
 
 - Embed namespace identifier when deploying the same manifests to multiple namespaces
@@ -156,6 +166,7 @@ optionalClusterRoleRules: []
     resources:
       - services
     verbs:
+      - get
       - create
       - patch
       - update

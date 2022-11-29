@@ -99,6 +99,8 @@ var _ = Describe("ManifestTemplate controller", func() {
 		Eventually(func() error {
 			return k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "test1"}, generated)
 		}, 5, 1).Should(Succeed())
+		Expect(generated.ObjectMeta.OwnerReferences[0].Name).Should(Equal("sample"))
+		Expect(generated.ObjectMeta.OwnerReferences[0].Kind).Should(Equal("ManifestTemplate"))
 		Expect(generated.ObjectMeta.Namespace).Should(Equal("test"))
 		Expect(generated.ObjectMeta.Labels).Should(Equal(map[string]string{"label1": "label1value"}))
 		Expect(generated.ObjectMeta.Annotations).Should(Equal(map[string]string{"annotation1": "annotation1value"}))
@@ -268,6 +270,74 @@ var _ = Describe("ManifestTemplate controller", func() {
 		Expect(svc.Spec.Selector["additional"]).Should(Equal(""))
 	})
 
+	It("resource already exists (manifest-template.takumakume.github.io/allow-update-already-exists: true)", func() {
+		currentSvc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "exists-svc",
+				Namespace: "test",
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Name: "http",
+						Port: 80,
+					},
+				},
+				Selector: map[string]string{
+					"app": "test",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, currentSvc)).Should(Succeed())
+		manifestTemplate := &manifesttemplatev1alpha1.ManifestTemplate{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "exists",
+				Namespace: "test",
+				Annotations: map[string]string{
+					"manifest-template.takumakume.github.io/allow-update-already-exists": "true",
+				},
+			},
+			Spec: manifesttemplatev1alpha1.ManifestTemplateSpec{
+				Kind:       "Service",
+				APIVersion: "v1",
+				ObjectMeta: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
+					Name:      "exists-svc",
+					Namespace: "test",
+				},
+				Spec: manifesttemplatev1alpha1.Spec{
+					Object: map[string]interface{}{
+						"ports": []map[string]interface{}{
+							{
+								"name": "http",
+								"port": 80,
+							},
+						},
+						"selector": map[string]interface{}{
+							"app":        "test",
+							"additional": "value",
+						},
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, manifestTemplate)).Should(Succeed())
+
+		Eventually(func() error {
+			o := &manifesttemplatev1alpha1.ManifestTemplate{}
+			if err := k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "exists"}, o); err != nil {
+				return err
+			}
+			if o.Status.Ready != corev1.ConditionTrue {
+				return fmt.Errorf("invalid .Status.Ready = %v", o.Status.Ready)
+			}
+			return nil
+		}, 5, 1).Should(Succeed())
+
+		svc := &corev1.Service{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "exists-svc"}, svc)).Should(Succeed())
+		Expect(svc.Spec.Selector["additional"]).Should(Equal("value"))
+	})
+
 	It("manifest valid", func() {
 		rawTestData, errReading := os.ReadFile(filepath.Join("testdata", "valid.yaml"))
 		if errReading != nil {
@@ -356,13 +426,6 @@ metadata:
     ns: 'test'
   name: 'test1'
   namespace: 'test'
-  ownerReferences:
-  - apiVersion: manifest-template.takumakume.github.io/v1alpha1
-    blockOwnerDeletion: true
-    controller: true
-    kind: ManifestTemplate
-    name: sample
-    uid: ""
 spec:
   ports:
   - name: http
@@ -408,13 +471,6 @@ kind: Service
 metadata:
   name: test1
   namespace: test
-  ownerReferences:
-  - apiVersion: manifest-template.takumakume.github.io/v1alpha1
-    blockOwnerDeletion: true
-    controller: true
-    kind: ManifestTemplate
-    name: sample
-    uid: ""
 spec:
   ports:
   - name: http

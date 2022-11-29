@@ -26,6 +26,7 @@ optionalClusterRoleRules: []
 #     resources:
 #       - ""
 #     verbs:
+#       - get
 #       - create
 #       - patch
 #       - update
