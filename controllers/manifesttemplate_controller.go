@@ -41,6 +41,10 @@ import (
 	manifesttemplatev1alpha1 "github.com/takumakume/manifest-template-operator/api/v1alpha1"
 )
 
+const (
+	annotationAllowUpdateAlreadyExists = "manifest-template.takumakume.github.io/allow-update-already-exists"
+)
+
 // ManifestTemplateReconciler reconciles a ManifestTemplate object
 type ManifestTemplateReconciler struct {
 	client.Client
@@ -97,6 +101,17 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	ownerRef := metav1.NewControllerRef(
+		&manifestTemplate.ObjectMeta,
+		schema.GroupVersionKind{
+			Group:   manifesttemplatev1alpha1.GroupVersion.Group,
+			Version: manifesttemplatev1alpha1.GroupVersion.Version,
+			Kind:    "ManifestTemplate",
+		})
+	ownerRef.Name = manifestTemplate.GetName()
+	ownerRef.UID = manifestTemplate.GetUID()
+	desired.SetOwnerReferences([]metav1.OwnerReference{*ownerRef})
+
 	exists := &unstructured.Unstructured{}
 	exists.SetAPIVersion(manifestTemplate.Spec.APIVersion)
 	exists.SetKind(manifestTemplate.Spec.Kind)
@@ -128,14 +143,20 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			// TODO: Change metadata.Name or Namespace -> recreate
 		} else {
 			log.Info("resource already exists")
-			r.recorder.Event(manifestTemplate, corev1.EventTypeWarning, "Stopped", fmt.Sprintf("resource already exists = desired %s", rawDesiredYAML))
-			m := manifestTemplate.DeepCopy()
-			m.Status.Ready = corev1.ConditionFalse
-			if err := r.Status().Patch(ctx, m, client.MergeFrom(manifestTemplate)); err != nil {
-				log.Error(err, "failed to patch ManifestTemplate status")
-				return ctrl.Result{}, err
+			if manifestTemplate.GetAnnotations()[annotationAllowUpdateAlreadyExists] != "true" {
+				r.recorder.Event(manifestTemplate, corev1.EventTypeWarning, "Stopped", fmt.Sprintf("resource already exists = desired %s", rawDesiredYAML))
+				m := manifestTemplate.DeepCopy()
+				m.Status.Ready = corev1.ConditionFalse
+				if err := r.Status().Patch(ctx, m, client.MergeFrom(manifestTemplate)); err != nil {
+					log.Error(err, "failed to patch ManifestTemplate status")
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{}, nil
+			} else {
+				log.Info(fmt.Sprintf("%s annotation is true, update resource without setting ownerRef", annotationAllowUpdateAlreadyExists))
+				desired.SetOwnerReferences([]metav1.OwnerReference{})
 			}
-			return ctrl.Result{}, nil
+
 		}
 		log.Info(fmt.Sprintf("update resource = desired %s", pp.Sprint(desired)))
 
@@ -179,17 +200,6 @@ func desiredYAML(manifestTemplate *manifesttemplatev1alpha1.ManifestTemplate) (s
 	}
 	u.SetLabels(manifestTemplate.Spec.ObjectMeta.Labels)
 	u.SetAnnotations(manifestTemplate.Spec.ObjectMeta.Annotations)
-
-	ownerRef := metav1.NewControllerRef(
-		&manifestTemplate.ObjectMeta,
-		schema.GroupVersionKind{
-			Group:   manifesttemplatev1alpha1.GroupVersion.Group,
-			Version: manifesttemplatev1alpha1.GroupVersion.Version,
-			Kind:    "ManifestTemplate",
-		})
-	ownerRef.Name = manifestTemplate.GetName()
-	ownerRef.UID = manifestTemplate.GetUID()
-	u.SetOwnerReferences([]metav1.OwnerReference{*ownerRef})
 
 	u.Object["spec"] = manifestTemplate.Spec.Spec.Object
 
