@@ -78,7 +78,7 @@ type ManifestTemplateSpec struct {
 
 	// Spec generate manifest spec
 	// +kubebuilder:validation:XPreserveUnknownFields
-	// +kubebuilder:validation:Required
+	// +optional
 	Spec Spec `json:"spec"`
 }
 

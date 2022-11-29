@@ -1,0 +1,11 @@
+---
+apiVersion: manifest-template.takumakume.github.io/v1alpha1
+kind: ManifestTemplate
+metadata:
+  name: valid-no-spec
+  namespace: test
+spec:
+  apiVersion: v1
+  kind: Namespace
+  metadata:
+    name: testx
