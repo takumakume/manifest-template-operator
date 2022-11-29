@@ -3,10 +3,10 @@ resources:
 
 namespace: '{{ .Release.Namespace }}'
 
-namePrefix: 'ingress-template-operator-'
+namePrefix: 'manifest-template-operator-'
 
 commonLabels:
-  app.kubernetes.io/name: ingress-template-operator
+  app.kubernetes.io/name: manifest-template-operator
 
 transformers:
   - label-transformer.yaml

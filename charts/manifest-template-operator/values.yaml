@@ -1,20 +1,20 @@
 
 image:
-  # image.repository -- ingress-template-controller image repository to use.
-  repository: takumakume/ingress-template-controller
+  # image.repository -- image repository to use.
+  repository: takumakume/manifest-template-controller
 
-  # image.tag -- ingress-template-controller image tag to use.
+  # image.tag -- image tag to use.
   # @default -- `{{ .Chart.AppVersion }}`
   tag:
 
-# nodeSelector -- nodeSelector used by ingress-template-controller.
+# nodeSelector -- nodeSelector used by controller.
 nodeSelector: {}
 
-# affinity -- affinity used by ingress-template-controller.
+# affinity -- affinity used by controller.
 affinity: {}
 
-# tolerations -- tolerations used by ingress-template-controller.
+# tolerations -- tolerations used by controller.
 tolerations: []
 
-# topologySpreadConstraints -- topologySpreadConstraints used by ingress-template-controller.
+# topologySpreadConstraints -- topologySpreadConstraints used by controller.
 topologySpreadConstraints: []
