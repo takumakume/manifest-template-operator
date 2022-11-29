@@ -103,7 +103,7 @@ metadata:
     app.kubernetes.io/name: manifest-template-controller
     app.kubernetes.io/version: '{{ .Chart.AppVersion }}'
     helm.sh/chart: '{{ include "manifest-template-operator.chart" . }}'
-  name: manifest-template-operator-manager-role
+  name: manifest-template-operator-manager-optional-role
 {{- with .Values.optionalClusterRoleRules }}
 rules:
   {{- toYaml . | nindent 2 }}
