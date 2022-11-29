@@ -203,6 +203,71 @@ var _ = Describe("ManifestTemplate controller", func() {
 		}, 5, 1).Should(Succeed())
 	})
 
+	It("resource already exists", func() {
+		currentSvc := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "exists-svc",
+				Namespace: "test",
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Name: "http",
+						Port: 80,
+					},
+				},
+				Selector: map[string]string{
+					"app": "test",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, currentSvc)).Should(Succeed())
+		manifestTemplate := &manifesttemplatev1alpha1.ManifestTemplate{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "exists",
+				Namespace: "test",
+			},
+			Spec: manifesttemplatev1alpha1.ManifestTemplateSpec{
+				Kind:       "Service",
+				APIVersion: "v1",
+				Metadata: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
+					Name:      "exists-svc",
+					Namespace: "test",
+				},
+				Spec: manifesttemplatev1alpha1.Spec{
+					Object: map[string]interface{}{
+						"ports": []map[string]interface{}{
+							{
+								"name": "http",
+								"port": 80,
+							},
+						},
+						"selector": map[string]interface{}{
+							"app":        "test",
+							"additional": "value",
+						},
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, manifestTemplate)).Should(Succeed())
+
+		Eventually(func() error {
+			o := &manifesttemplatev1alpha1.ManifestTemplate{}
+			if err := k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "exists"}, o); err != nil {
+				return err
+			}
+			if o.Status.Ready != corev1.ConditionFalse {
+				return fmt.Errorf("invalid .Status.Ready = %v", o.Status.Ready)
+			}
+			return nil
+		}, 5, 1).Should(Succeed())
+
+		svc := &corev1.Service{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Namespace: "test", Name: "exists-svc"}, svc)).Should(Succeed())
+		Expect(svc.Spec.Selector["additional"]).Should(Equal(""))
+	})
+
 	It("manifest valid", func() {
 		rawTestData, errReading := os.ReadFile(filepath.Join("testdata", "valid.yaml"))
 		if errReading != nil {

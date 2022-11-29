@@ -126,6 +126,16 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			}
 
 			// TODO: Change metadata.Name or Namespace -> recreate
+		} else {
+			log.Info("resource already exists")
+			r.recorder.Event(manifestTemplate, corev1.EventTypeWarning, "Stopped", fmt.Sprintf("resource already exists = desired %s", rawDesiredYAML))
+			m := manifestTemplate.DeepCopy()
+			m.Status.Ready = corev1.ConditionFalse
+			if err := r.Status().Patch(ctx, m, client.MergeFrom(manifestTemplate)); err != nil {
+				log.Error(err, "failed to patch ManifestTemplate status")
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil
 		}
 		log.Info(fmt.Sprintf("update resource = desired %s", pp.Sprint(desired)))
 
