@@ -363,6 +363,25 @@ var _ = Describe("ManifestTemplate controller", func() {
 		Expect(generated.Spec.Selector["app"]).Should(Equal("test1"))
 		Expect(generated.Spec.Selector["ns"]).Should(Equal("test"))
 	})
+
+	It("manifest valid no .spec.spec", func() {
+		rawTestData, errReading := os.ReadFile(filepath.Join("testdata", "valid-no-spec.yaml"))
+		if errReading != nil {
+			Fail("Failed to read valid test file")
+		}
+		manifestTemplate := &manifesttemplatev1alpha1.ManifestTemplate{}
+
+		d := yaml.NewYAMLOrJSONDecoder(strings.NewReader(string(rawTestData)), len(rawTestData))
+		errDecording := d.Decode(manifestTemplate)
+		if errDecording != nil {
+			Fail("Failed to decode test data")
+		}
+		Expect(k8sClient.Create(ctx, manifestTemplate)).Should(Succeed())
+
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{Name: "testx"}, &corev1.Namespace{})
+		}, 5, 1).Should(Succeed())
+	})
 })
 
 func Test_desiredYAML(t *testing.T) {
@@ -477,6 +496,31 @@ spec:
     port: 80
   selector:
     app: test1
+`,
+		},
+		{
+			name: "default namespace",
+			args: args{
+				manifestTemplate: &manifesttemplatev1alpha1.ManifestTemplate{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "sample",
+						Namespace: "test",
+					},
+					Spec: manifesttemplatev1alpha1.ManifestTemplateSpec{
+						Kind:       "Namespace",
+						APIVersion: "v1",
+						ObjectMeta: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
+							Name:      "test1",
+							Namespace: "test",
+						},
+					},
+				},
+			},
+			want: `apiVersion: v1
+kind: Namespace
+metadata:
+  name: test1
+  namespace: test
 `,
 		},
 	}

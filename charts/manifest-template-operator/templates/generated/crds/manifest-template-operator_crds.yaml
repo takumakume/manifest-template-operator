@@ -71,7 +71,6 @@ spec:
                 - apiVersion
                 - kind
                 - metadata
-                - spec
               type: object
             status:
               description: ManifestTemplateStatus defines the observed state of ManifestTemplate

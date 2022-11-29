@@ -201,7 +201,9 @@ func desiredYAML(manifestTemplate *manifesttemplatev1alpha1.ManifestTemplate) (s
 	u.SetLabels(manifestTemplate.Spec.ObjectMeta.Labels)
 	u.SetAnnotations(manifestTemplate.Spec.ObjectMeta.Annotations)
 
-	u.Object["spec"] = manifestTemplate.Spec.Spec.Object
+	if manifestTemplate.Spec.Spec.Object != nil {
+		u.Object["spec"] = manifestTemplate.Spec.Spec.Object
+	}
 
 	yamlBuf, err := yaml.Marshal(u)
 	if err != nil {
