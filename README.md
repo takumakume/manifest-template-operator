@@ -143,3 +143,21 @@ $ helm install --create-namespace --namespace manifest-template-operator-system 
 ```
 
 Values: ref [charts/manifest-template-operator/values.yaml](https://github.com/takumakume/manifest-template-operator/blob/main/charts/manifest-template-operator/values.yaml)
+
+In order for the controller to create and update any resource, the Service Account must be authorized.
+
+For Helm, configure as follows:
+
+```yaml
+# example: when managing Service
+optionalClusterRoleRules: []
+  - apiGroups:
+      - ""
+    resources:
+      - "Service"
+    verbs:
+      - create
+      - patch
+      - update
+      - delete
+```

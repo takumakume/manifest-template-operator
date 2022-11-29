@@ -18,3 +18,15 @@ tolerations: []
 
 # topologySpreadConstraints -- topologySpreadConstraints used by controller.
 topologySpreadConstraints: []
+
+# optionalClusterRoleRules -- optionalClusterRoleRules used by controller. 
+optionalClusterRoleRules: []
+#   - apiGroups:
+#       - ""
+#     resources:
+#       - ""
+#     verbs:
+#       - create
+#       - patch
+#       - update
+#       - delete

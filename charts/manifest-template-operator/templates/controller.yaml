@@ -93,3 +93,40 @@ spec:
       topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: manifest-template-controller
+    app.kubernetes.io/version: '{{ .Chart.AppVersion }}'
+    helm.sh/chart: '{{ include "manifest-template-operator.chart" . }}'
+  name: manifest-template-operator-manager-role
+{{- with .Values.optionalClusterRoleRules }}
+rules:
+  {{- toYaml . | nindent 8 }}
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: manifest-template-operator
+    app.kubernetes.io/instance: manager-rolebinding
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: manifest-template-controller
+    app.kubernetes.io/part-of: manifest-template-operator
+    app.kubernetes.io/version: '{{ .Chart.AppVersion }}'
+    helm.sh/chart: '{{ include "manifest-template-operator.chart" . }}'
+  name: manifest-template-operator-manager-optional-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: manifest-template-operator-manager-optional-role
+subjects:
+  - kind: ServiceAccount
+    name: manifest-template-operator-controller-manager
+    namespace: '{{ .Release.Namespace }}'
