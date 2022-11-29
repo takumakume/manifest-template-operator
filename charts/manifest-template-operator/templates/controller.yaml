@@ -106,7 +106,7 @@ metadata:
   name: manifest-template-operator-manager-role
 {{- with .Values.optionalClusterRoleRules }}
 rules:
-  {{- toYaml . | nindent 8 }}
+  {{- toYaml . | nindent 2 }}
 {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
