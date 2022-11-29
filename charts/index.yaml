@@ -2,8 +2,19 @@ apiVersion: v1
 entries:
   manifest-template-operator:
   - apiVersion: v2
+    appVersion: 0.0.5
+    created: "2022-11-29T17:52:57.616663+09:00"
+    description: Deploy manifest-template-controller that generate and apply manifest
+      from template
+    digest: eca1c400e6f1ff395ca75454baa594811102faf5ce9de0a47ff63894908e48bf
+    name: manifest-template-operator
+    type: application
+    urls:
+    - manifest-template-operator-0.0.5.tgz
+    version: 0.0.5
+  - apiVersion: v2
     appVersion: 0.0.4
-    created: "2022-11-29T16:56:24.171588+09:00"
+    created: "2022-11-29T17:52:57.615492+09:00"
     description: Deploy manifest-template-controller that generate and apply manifest
       from template
     digest: a417d04cdcdae6654bbabea1015c4ae2c45159bc0da5575102da51926fd28ba3
@@ -14,7 +25,7 @@ entries:
     version: 0.0.4
   - apiVersion: v2
     appVersion: 0.0.3
-    created: "2022-11-29T16:56:24.171118+09:00"
+    created: "2022-11-29T17:52:57.614837+09:00"
     description: Deploy manifest-template-controller that generate and apply manifest
       from template
     digest: 46d4bacde67c41e29e41ef1de34817a2e4fad17912c39591f72aabf8db1111bd
@@ -23,4 +34,4 @@ entries:
     urls:
     - manifest-template-operator-0.0.3.tgz
     version: 0.0.3
-generated: "2022-11-29T16:56:24.170212+09:00"
+generated: "2022-11-29T17:52:57.61375+09:00"
