@@ -156,6 +156,7 @@ optionalClusterRoleRules: []
     resources:
       - services
     verbs:
+      - get
       - create
       - patch
       - update
