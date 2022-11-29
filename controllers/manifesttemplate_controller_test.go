@@ -56,7 +56,7 @@ var _ = Describe("ManifestTemplate controller", func() {
 			Spec: manifesttemplatev1alpha1.ManifestTemplateSpec{
 				Kind:       "Service",
 				APIVersion: "v1",
-				Metadata: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
+				ObjectMeta: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
 					Name:      "{{ .Self.ObjectMeta.Namespace }}1",
 					Namespace: "{{ .Self.ObjectMeta.Namespace }}",
 					Labels: map[string]string{
@@ -230,7 +230,7 @@ var _ = Describe("ManifestTemplate controller", func() {
 			Spec: manifesttemplatev1alpha1.ManifestTemplateSpec{
 				Kind:       "Service",
 				APIVersion: "v1",
-				Metadata: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
+				ObjectMeta: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
 					Name:      "exists-svc",
 					Namespace: "test",
 				},
@@ -316,7 +316,7 @@ func Test_desiredYAML(t *testing.T) {
 					Spec: manifesttemplatev1alpha1.ManifestTemplateSpec{
 						Kind:       "Service",
 						APIVersion: "v1",
-						Metadata: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
+						ObjectMeta: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
 							Name:      "{{ .Self.ObjectMeta.Namespace }}1",
 							Namespace: "{{ .Self.ObjectMeta.Namespace }}",
 							Labels: map[string]string{
@@ -383,7 +383,7 @@ spec:
 					Spec: manifesttemplatev1alpha1.ManifestTemplateSpec{
 						Kind:       "Service",
 						APIVersion: "v1",
-						Metadata: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
+						ObjectMeta: manifesttemplatev1alpha1.ManifestTemplateSpecMeta{
 							Name: "test1",
 							// add default namespace
 						},

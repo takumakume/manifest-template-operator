@@ -72,14 +72,14 @@ type ManifestTemplateSpec struct {
 	// +kubebuilder:validation:Required
 	APIVersion string `json:"apiVersion"`
 
-	// Metadata generate manifest metadata
+	// ObjectMeta generate manifest metadata
 	// +kubebuilder:validation:Required
-	Metadata ManifestTemplateSpecMeta `json:"Metadata"`
+	ObjectMeta ManifestTemplateSpecMeta `json:"metadata"`
 
 	// Spec generate manifest spec
 	// +kubebuilder:validation:XPreserveUnknownFields
 	// +kubebuilder:validation:Required
-	Spec Spec `json:"Spec"`
+	Spec Spec `json:"spec"`
 }
 
 type ManifestTemplateSpecMeta struct {

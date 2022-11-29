@@ -171,14 +171,14 @@ func desiredYAML(manifestTemplate *manifesttemplatev1alpha1.ManifestTemplate) (s
 	u := &unstructured.Unstructured{}
 	u.SetKind(manifestTemplate.Spec.Kind)
 	u.SetAPIVersion(manifestTemplate.Spec.APIVersion)
-	u.SetName(manifestTemplate.Spec.Metadata.Name)
-	if manifestTemplate.Spec.Metadata.Namespace != "" {
-		u.SetNamespace(manifestTemplate.Spec.Metadata.Namespace)
+	u.SetName(manifestTemplate.Spec.ObjectMeta.Name)
+	if manifestTemplate.Spec.ObjectMeta.Namespace != "" {
+		u.SetNamespace(manifestTemplate.Spec.ObjectMeta.Namespace)
 	} else {
 		u.SetNamespace(manifestTemplate.ObjectMeta.Namespace)
 	}
-	u.SetLabels(manifestTemplate.Spec.Metadata.Labels)
-	u.SetAnnotations(manifestTemplate.Spec.Metadata.Annotations)
+	u.SetLabels(manifestTemplate.Spec.ObjectMeta.Labels)
+	u.SetAnnotations(manifestTemplate.Spec.ObjectMeta.Annotations)
 
 	ownerRef := metav1.NewControllerRef(
 		&manifestTemplate.ObjectMeta,

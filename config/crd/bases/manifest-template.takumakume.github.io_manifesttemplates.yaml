@@ -35,8 +35,14 @@ spec:
           spec:
             description: ManifestTemplateSpec defines the desired state of ManifestTemplate
             properties:
-              Metadata:
-                description: Metadata generate manifest metadata
+              apiVersion:
+                description: APIVersion generate manifest apiVersion
+                type: string
+              kind:
+                description: Kind generate manifest kind
+                type: string
+              metadata:
+                description: ObjectMeta generate manifest metadata
                 properties:
                   annotations:
                     additionalProperties:
@@ -57,21 +63,15 @@ spec:
                 required:
                 - name
                 type: object
-              Spec:
+              spec:
                 description: Spec generate manifest spec
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
-              apiVersion:
-                description: APIVersion generate manifest apiVersion
-                type: string
-              kind:
-                description: Kind generate manifest kind
-                type: string
             required:
-            - Metadata
-            - Spec
             - apiVersion
             - kind
+            - metadata
+            - spec
             type: object
           status:
             description: ManifestTemplateStatus defines the observed state of ManifestTemplate
