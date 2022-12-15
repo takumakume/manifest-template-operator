@@ -27,22 +27,15 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// Unstructured values for rendering Helm Charts
 // +k8s:deepcopy-gen=false
 type Spec struct {
-	// Object is a JSON compatible map with string, float, int, bool, []interface{}, or
-	// map[string]interface{} children.
 	Object map[string]interface{} `json:"-"`
 }
 
-// MarshalJSON ensures that the unstructured object produces proper
-// JSON when passed to Go's standard JSON library.
 func (u *Spec) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.Object)
 }
 
-// UnmarshalJSON ensures that the unstructured object properly decodes
-// JSON when passed to Go's standard JSON library.
 func (u *Spec) UnmarshalJSON(data []byte) error {
 	m := make(map[string]interface{})
 	if err := json.Unmarshal(data, &m); err != nil {
@@ -54,7 +47,6 @@ func (u *Spec) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Declaring this here prevents it from being generated.
 func (u *Spec) DeepCopyInto(out *Spec) {
 	out.Object = runtime.DeepCopyJSON(u.Object)
 }
