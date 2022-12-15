@@ -77,7 +77,7 @@ type ManifestTemplateSpec struct {
 	ObjectMeta ManifestTemplateSpecMeta `json:"metadata"`
 
 	// Spec generate manifest spec
-	// +kubebuilder:validation:XPreserveUnknownFields
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Spec Spec `json:"spec"`
 }
