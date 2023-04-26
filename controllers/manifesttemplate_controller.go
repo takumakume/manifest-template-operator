@@ -158,6 +158,9 @@ func (r *ManifestTemplateReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			}
 
 		}
+
+		desired.SetResourceVersion(exists.GetResourceVersion())
+
 		log.Info(fmt.Sprintf("update resource = desired %s", pp.Sprint(desired)))
 
 		if err := r.Update(ctx, desired); err != nil {
